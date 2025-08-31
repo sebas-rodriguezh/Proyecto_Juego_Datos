@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List
 
 @dataclass
-class Pedido:
+class Order:
     id: str
     pickup: List[int]
     dropoff: List[int]
