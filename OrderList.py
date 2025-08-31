@@ -120,7 +120,7 @@ class OrderList:
     def from_api_response(cls, api_response: dict) -> 'OrderList':
         """Crea una OrderList directamente desde la respuesta de la API"""
         order_list = cls()
-        orders = Order.from_list(api_response['data'])
+        orders = orders.from_list(api_response['data'])
         for order in orders:
             order_list.append(order)
         return order_list
@@ -228,6 +228,16 @@ def probar_metodos_simples():
     print(f"   Como lista: {[o.id for o in lista_normal]}")
     lista_normal
     print("🎉 ¡Todas las pruebas pasaron!")
+    
+    #8. from_api_response, crea la lista directamente
+    print("---------Prueba from_api_response---------")
+    lista_directa = OrderList.from_api_response(orders)
+   
+
+    # #9 from_orders, si funciona se puede optimizar para hacer busca por Id...
+    # lista_directa2 = OrderList.from_orders(lista_normal)
+    # print(lista_directa2)
+
 
 # Ejecutar pruebas simples
 if __name__ == "__main__":
