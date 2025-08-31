@@ -210,6 +210,7 @@ def probar_metodos_simples():
     "" 
     "")
 
+    print("funciona")
     print(lista_desde_api.peek_left())
     print("Pedido entregado...")
     lista_desde_api.dequeue()
