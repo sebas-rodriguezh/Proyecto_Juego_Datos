@@ -7,7 +7,7 @@ class Player:
         self.speed = 3  # celdas por segundo
         self.stamina = 100
         self.reputation = 70
-        self.inventory = [] #Se cambia por lista de tipo objeto pedido.
+        self.inventory = [] #Se cambia por lista de tipo objeto pedod
         self.max_weight = 5
         self.current_weight = 0
         self.state = "normal"  # normal, tired, exhausted

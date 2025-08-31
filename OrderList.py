@@ -4,6 +4,8 @@ from collections import deque
 from typing import List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from api_manager import APIManager
+import requests
 
 
 @dataclass
@@ -25,7 +27,7 @@ class OrderList:
             raise IndexError("Pop from empty OrderList")
         return self._orders.pop()
     
-    def pop_left(self) -> Order:
+    def dequeue(self) -> Order:
         """Remueve y retorna la primera orden"""
         if self.is_empty():
             raise IndexError("Pop from empty OrderList")
@@ -70,7 +72,8 @@ class OrderList:
                 return True
         return False
     
-    def get_highest_priority (self) -> int:
+    def get_highest_priority(self) -> int:
+        """Obtiene la prioridad más alta de todas las órdenes"""
         if self.is_empty():
             return -1
         return max(order.priority for order in self._orders)
@@ -80,6 +83,7 @@ class OrderList:
         return [order for order in self._orders if order.priority == priority]
     
     def get_high_priority_orders(self) -> List[Order]:
+        """Obtiene todas las órdenes con la prioridad más alta"""
         if self.is_empty():
             return []
         val = self.get_highest_priority()
@@ -96,7 +100,7 @@ class OrderList:
     def sort_by_payout(self, reverse: bool = False) -> None:
         """Ordena las órdenes por payout (mayor a menor por defecto)"""
         self._orders = deque(sorted(self._orders, key=lambda x: x.payout, reverse=not reverse))
-
+    
     def sort_by_priority(self, reverse: bool = False) -> None:
         """Ordena las órdenes por prioridad (mayor a menor por defecto)"""
         if self.is_empty():
@@ -105,13 +109,13 @@ class OrderList:
         self._orders = deque(sorted(self._orders, key=lambda order: order.priority, reverse=not reverse))
 
     def get_sorted_by_priority(self, reverse: bool = False) -> List[Order]:
+        """Devuelve una lista ordenada por prioridad sin modificar la original"""
         if self.is_empty():
             return []
         return sorted(self._orders, 
                     key=lambda order: order.priority, 
                     reverse=not reverse)
         
-
     def sort_by_deadline(self, reverse: bool = False) -> None:
         """Ordena las órdenes por deadline (más cercano primero por defecto)"""
         self._orders = deque(sorted(self._orders, key=lambda x: x.deadline, reverse=reverse))
@@ -120,13 +124,36 @@ class OrderList:
     def from_api_response(cls, api_response: dict) -> 'OrderList':
         """Crea una OrderList directamente desde la respuesta de la API"""
         order_list = cls()
-        orders = orders.from_list(api_response['data'])
-        for order in orders:
+        
+        # Procesar cada orden de la respuesta de la API
+        for order_data in api_response['data']:
+            # Convertir el string de deadline a datetime si es necesario
+            if isinstance(order_data['deadline'], str):
+                try:
+                    deadline = datetime.strptime(order_data['deadline'], '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    # Si falla el parsing, usar datetime actual como fallback
+                    deadline = datetime.now()
+            else:
+                deadline = order_data['deadline']
+            
+            # Crear la orden
+            order = Order(
+                id=order_data['id'],
+                pickup=order_data['pickup'],
+                dropoff=order_data['dropoff'],
+                payout=order_data['payout'],
+                deadline=deadline,
+                weight=order_data['weight'],
+                priority=order_data['priority'],
+                release_time=order_data['release_time']
+            )
             order_list.append(order)
+        
         return order_list
     
     @classmethod
-    def from_orders(cls, orders: List[Order]) -> 'OrderList':
+    def from_list(cls, orders: List[Order]) -> 'OrderList':
         """Crea una OrderList desde una lista de Orders existente"""
         order_list = cls()
         for order in orders:
@@ -166,78 +193,42 @@ class OrderList:
     
 
 def probar_metodos_simples():
-    print("🔧 PROBANDO MÉTODOS BÁSICOS")
-    print("=" * 40)
-    
-    # Crear órdenes simples
-    ahora = datetime.now()
-    
-    order1 = Order("REQ-001", [20, 19], [10, 22], 180.0, 
-                  ahora + timedelta(hours=1), 1, 0, 0)
-    
-    order2 = Order("REQ-002", [27, 24], [4, 6], 260.0, 
-                  ahora + timedelta(hours=2), 2, 1, 45)
-    
-    order3 = Order("REQ-003", [15, 20], [8, 12], 150.0, 
-                  ahora + timedelta(hours=3), 1, 0, 30)
-    
-    order4 = Order("REQ-004", [15, 20], [8, 12], 150.0, 
-                  ahora + timedelta(hours=3), 1, 4, 30)
-    
-    order5 = Order("REQ-005", [15, 20], [8, 12], 150.0, 
-                  ahora + timedelta(hours=3), 1, 4, 30)
 
-
-    # 1. Crear lista
-    orders = OrderList()
-    print("✅ Lista creada vacía")
-    
-    # 2. Añadir órdenes
-    orders.append(order1)
-    orders.append(order2)
-    orders.append(order4)
-    orders.append(order5)
-    orders.append_left(order3)
-    print(f"✅ Órdenes añadidas: {orders}")
-    
-    # 3. Métodos básicos
-    print(f"   Tamaño: {len(orders)}")
-    print(f"   ¿Vacía?: {orders.is_empty()}")
-    print(f"   Primera: {orders.peek_left().id}")
-    print(f"   Última: {orders.peek().id}")
-    
-    # 4. Buscar
-    encontrada = orders.find_by_id("REQ-002")
-    print(f"   Buscar REQ-002: {encontrada.payout if encontrada else 'No'}")
-    
-    # 5. Filtrar
-    urgentes = orders.get_high_priority_orders()
-    print(f"   Urgentes: {[(o.priority, o.id) for o in urgentes]}")
-    
-    #Probar sorted de lista por prioridad.
-    ordersnew = orders.get_sorted_by_priority()
-    print(f"Por prioridad: {[o.id for o in ordersnew]}")
-
-
-    # 6. Remover
-    orders.remove_by_id("REQ-001")
-    print(f"   REQ-001 removida: {orders}")
-    
-    # 7. Convertir a lista
-    lista_normal = orders.to_list()
-    print(f"   Como lista: {[o.id for o in lista_normal]}")
-    lista_normal
-    print("🎉 ¡Todas las pruebas pasaron!")
-    
-    #8. from_api_response, crea la lista directamente
+    # 9. Probar from_api_response con datos simulados
     print("---------Prueba from_api_response---------")
-    lista_directa = OrderList.from_api_response(orders)
-   
+    
+    # Simular respuesta de API
+    base_url = "https://tigerds-api.kindflower-ccaf48b6.eastus.azurecontainerapps.io"   
 
-    # #9 from_orders, si funciona se puede optimizar para hacer busca por Id...
-    # lista_directa2 = OrderList.from_orders(lista_normal)
-    # print(lista_directa2)
+    data3 = APIManager(base_url).get_jobs()
 
+
+    lista_desde_api = OrderList.from_api_response(data3)
+
+    #print([o for o in lista_desde_api])
+
+    lista_desde_api.sort_by_priority()
+    print("  " 
+    "" 
+    "")
+
+    print(lista_desde_api.peek_left())
+    print("Pedido entregado...")
+    lista_desde_api.dequeue()
+    print("Pedido a entregar:")
+    print(lista_desde_api.peek_left())
+    print("Pedido entregado...")
+    lista_desde_api.dequeue()
+    print("Pedido a entregar:")
+    print(lista_desde_api.peek_left())
+    print("Pedido entregado...")
+    lista_desde_api.dequeue()
+    print("Pedido a entregar:")
+    print(lista_desde_api.peek_left())
+    print("Pedido entregado...")
+    lista_desde_api.dequeue()
+    print("Pedido a entregar:")
+    print(lista_desde_api.peek_left())
 
 # Ejecutar pruebas simples
 if __name__ == "__main__":
