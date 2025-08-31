@@ -2,7 +2,8 @@ import requests
 import pygame
 import math
 from datetime import datetime
-from Player import Player  # Asegúrate de que el archivo se llama Player.py
+from Player import Player
+from OrderList import OrderList
 
 # Configuración inicial
 url = "https://tigerds-api.kindflower-ccaf48b6.eastus.azurecontainerapps.io"
@@ -17,25 +18,24 @@ try:
     data4 = resp4.json()
 except requests.exceptions.RequestException as e:
     print(f"Error al conectar con la API: {e}")
-    print("Cargando datos desde caché...")
-    # Aquí cargarías los datos desde archivos locales
-    # data = load_local_data("data/ciudad.json")
-    # data3 = load_local_data("data/pedidos.json")
-    # data4 = load_local_data("data/weather.json")
-    # Por ahora, salimos del programa
     exit()
 
 # Extraer información
 tiles = data["data"]["tiles"]
 legend = data["data"]["legend"]
-jobs = data3["data"]
+jobs = data3["data"]  # Lista original de trabajos
 weather = data4["data"]
+
+# Lista para trabajos activos (que pueden ser recogidos)
+active_jobs = jobs.copy()
+# Lista para trabajos completados
+completed_jobs = []
 
 # Inicializar pygame
 pygame.init()
-tile_size = 32  # Aumentamos el tamaño de los tiles para mejor visualización
+tile_size = 32
 rows, cols = len(tiles), len(tiles[0])
-screen_width = cols * tile_size + 300  # Espacio adicional para el panel lateral
+screen_width = cols * tile_size + 300
 screen_height = rows * tile_size
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Courier Quest")
@@ -54,41 +54,41 @@ except:
 colors = {}
 for char, info in legend.items():
     if info["name"] == "street":
-        colors[char] = (200, 200, 200)  # gris
+        colors[char] = (200, 200, 200)
     elif info["name"] == "building":
-        colors[char] = (50, 50, 50)     # negro
+        colors[char] = (50, 50, 50)
     elif info["name"] == "park":
-        colors[char] = (100, 200, 100)  # verde
+        colors[char] = (100, 200, 100)
     else:
-        colors[char] = (100, 100, 255)  # azul por defecto
+        colors[char] = (100, 100, 255)
 
 # Colores para los trabajos
 job_colors = [
-    (255, 100, 100),  # Rojo claro
-    (100, 100, 255),  # Azul claro
-    (255, 255, 100),  # Amarillo claro
-    (255, 100, 255),  # Magenta claro
-    (100, 255, 255),  # Cian claro
+    (255, 100, 100), (100, 100, 255), (255, 255, 100),
+    (255, 100, 255), (100, 255, 255)
 ]
 
 # Colores para las condiciones climáticas
 weather_colors = {
-    "clear": (255, 255, 100),      # Amarillo claro
-    "clouds": (200, 200, 220),     # Gris azulado
-    "rain_light": (150, 150, 255), # Azul medio
-    "rain": (100, 100, 255),       # Azul
-    "storm": (150, 50, 200),       # Púrpura
-    "fog": (180, 180, 200),        # Gris azulado claro
-    "wind": (200, 220, 255),       # Azul muy claro
-    "heat": (255, 150, 50),        # Naranja
-    "cold": (150, 220, 255),       # Azul celeste
+    "clear": (255, 255, 100), "clouds": (200, 200, 220),
+    "rain_light": (150, 150, 255), "rain": (100, 100, 255),
+    "storm": (150, 50, 200), "fog": (180, 180, 200),
+    "wind": (200, 220, 255), "heat": (255, 150, 50),
+    "cold": (150, 220, 255)
 }
 
-# Crear jugador en una posición inicial (por ejemplo, en el centro)
+# Crear jugador
 player = Player(cols // 2, rows // 2, tile_size, legend)
 
 # Cámara para seguir al jugador
 camera_x, camera_y = 0, 0
+
+# Variables para control de interacción
+selected_job = None
+interaction_cooldown = 0
+message = ""
+message_timer = 0
+total_earnings = 0  # Dinero total ganado
 
 # Función para dibujar el panel lateral
 def draw_sidebar():
@@ -96,9 +96,12 @@ def draw_sidebar():
     pygame.draw.rect(screen, (240, 240, 240), sidebar_rect)
     pygame.draw.line(screen, (200, 200, 200), (cols * tile_size, 0), (cols * tile_size, screen_height), 2)
     
-    # Título
+    # Título y ganancias
     title = font_large.render("Courier Quest", True, (0, 0, 0))
     screen.blit(title, (cols * tile_size + 10, 10))
+    
+    earnings_text = font_medium.render(f"Ganancias: ${total_earnings}", True, (0, 100, 0))
+    screen.blit(earnings_text, (cols * tile_size + 150, 12))
     
     # Información del jugador
     player_title = font_medium.render("Estado del Repartidor:", True, (0, 0, 0))
@@ -120,32 +123,50 @@ def draw_sidebar():
     weight_text = font_small.render(f"Peso: {player.current_weight}/{player.max_weight}", True, (0, 0, 0))
     screen.blit(weight_text, (cols * tile_size + 10, 135))
     
+    # Inventario actual
+    inventory_title = font_medium.render("Inventario:", True, (0, 0, 0))
+    screen.blit(inventory_title, (cols * tile_size + 10, 160))
+    
+    if player.inventory:
+        for i, job in enumerate(player.inventory):
+            y_pos = 185 + i * 40
+            pygame.draw.rect(screen, (200, 255, 200), (cols * tile_size + 10, y_pos, 280, 35))
+            pygame.draw.rect(screen, (0, 200, 0), (cols * tile_size + 10, y_pos, 280, 35), 2)
+            
+            job_id = font_small.render(f"ID: {job['id']}", True, (0, 0, 0))
+            screen.blit(job_id, (cols * tile_size + 15, y_pos + 5))
+            
+            destination = font_small.render(f"Entrega: {job['dropoff']}", True, (0, 0, 0))
+            screen.blit(destination, (cols * tile_size + 15, y_pos + 20))
+    else:
+        no_items = font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
+        screen.blit(no_items, (cols * tile_size + 15, 185))
+    
     # Información del clima
     weather_title = font_medium.render("Condición Climática:", True, (0, 0, 0))
-    screen.blit(weather_title, (cols * tile_size + 10, 160))
+    weather_y_pos = 250 if not player.inventory else 185 + len(player.inventory) * 40 + 10
+    screen.blit(weather_title, (cols * tile_size + 10, weather_y_pos))
     
-    # Dibujar círculo con el color del clima actual
     current_weather = weather["initial"]["condition"]
-    pygame.draw.circle(screen, weather_colors[current_weather], (cols * tile_size + 40, 195), 15)
+    pygame.draw.circle(screen, weather_colors[current_weather], (cols * tile_size + 40, weather_y_pos + 35), 15)
     
     weather_text = font_small.render(current_weather.replace("_", " ").title(), True, (0, 0, 0))
-    screen.blit(weather_text, (cols * tile_size + 60, 185))
+    screen.blit(weather_text, (cols * tile_size + 60, weather_y_pos + 25))
     
     intensity_text = font_small.render(f"Intensidad: {weather['initial']['intensity']:.2f}", True, (0, 0, 0))
-    screen.blit(intensity_text, (cols * tile_size + 60, 200))
+    screen.blit(intensity_text, (cols * tile_size + 60, weather_y_pos + 40))
     
-    # Lista de trabajos
+    # Lista de trabajos disponibles
     jobs_title = font_medium.render("Trabajos Disponibles:", True, (0, 0, 0))
-    screen.blit(jobs_title, (cols * tile_size + 10, 230))
+    jobs_y_pos = weather_y_pos + 70
+    screen.blit(jobs_title, (cols * tile_size + 10, jobs_y_pos))
     
-    for i, job in enumerate(jobs):
-        y_pos = 255 + i * 70
+    for i, job in enumerate(active_jobs):
+        y_pos = jobs_y_pos + 25 + i * 70
         
-        # Dibujar color del trabajo
         pygame.draw.rect(screen, job_colors[i % len(job_colors)], 
                         (cols * tile_size + 10, y_pos, 20, 20))
         
-        # Información del trabajo
         job_id = font_small.render(f"ID: {job['id']}", True, (0, 0, 0))
         screen.blit(job_id, (cols * tile_size + 35, y_pos))
         
@@ -174,8 +195,13 @@ def draw_sidebar():
 
 # Función para dibujar marcadores de trabajos en el mapa
 def draw_job_markers():
-    for i, job in enumerate(jobs):
+    # Dibujar solo trabajos activos (no completados)
+    for i, job in enumerate(active_jobs):
         color = job_colors[i % len(job_colors)]
+        
+        # Si el trabajo está en el inventario, usar color verde
+        if job in player.inventory:
+            color = (0, 255, 0)  # Verde para trabajos en inventario
         
         # Dibujar punto de recogida
         pickup_x, pickup_y = job["pickup"]
@@ -199,13 +225,14 @@ def draw_job_markers():
                          dropoff_y * tile_size + tile_size // 2 - 5 - camera_y, 
                          10, 10), 1)
         
-        # Dibujar línea conectando recogida y entrega
-        pygame.draw.line(screen, color, 
-                        (pickup_x * tile_size + tile_size // 2 - camera_x, 
-                         pickup_y * tile_size + tile_size // 2 - camera_y),
-                        (dropoff_x * tile_size + tile_size // 2 - camera_x, 
-                         dropoff_y * tile_size + tile_size // 2 - camera_y), 
-                        2)
+        # Dibujar línea conectando recogida y entrega (solo si no está en inventario)
+        if job not in player.inventory:
+            pygame.draw.line(screen, color, 
+                            (pickup_x * tile_size + tile_size // 2 - camera_x, 
+                             pickup_y * tile_size + tile_size // 2 - camera_y),
+                            (dropoff_x * tile_size + tile_size // 2 - camera_x, 
+                             dropoff_y * tile_size + tile_size // 2 - camera_y), 
+                            2)
 
 # Bucle principal
 running = True
@@ -213,16 +240,70 @@ clock = pygame.time.Clock()
 last_time = pygame.time.get_ticks()
 
 while running:
-    # Calcular delta time
     current_time = pygame.time.get_ticks()
-    dt = (current_time - last_time) / 1000.0  # Convertir a segundos
+    dt = (current_time - last_time) / 1000.0
     last_time = current_time
+    
+    if interaction_cooldown > 0:
+        interaction_cooldown -= dt
+    
+    if message_timer > 0:
+        message_timer -= dt
+    else:
+        message = ""
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            
+            if mouse_x > cols * tile_size:
+                weather_y_pos = 250 if not player.inventory else 185 + len(player.inventory) * 40 + 10
+                jobs_y_pos = weather_y_pos + 70
+                job_index = (mouse_y - jobs_y_pos - 25) // 70
+                
+                if 0 <= job_index < len(active_jobs):
+                    selected_job = active_jobs[job_index]
+                    message = f"Seleccionado: {selected_job['id']}"
+                    message_timer = 3
+        
+        # Tecla E para interactuar (recoger/entregar)
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and interaction_cooldown <= 0:
+            # Primero verificar entregas (tiene prioridad)
+            for job in player.inventory[:]:  # Usamos copia para modificar durante iteración
+                if player.is_at_location(job["dropoff"]):
+                    if player.remove_from_inventory(job["id"]):
+                        # Añadir a trabajos completados y remover de activos
+                        completed_jobs.append(job)
+                        if job in active_jobs:
+                            active_jobs.remove(job)
+                        
+                        # Sumar ganancias
+                        total_earnings += job["payout"]
+                        
+                        message = f"Entregado: {job['id']} +${job['payout']}"
+                        message_timer = 3
+                        interaction_cooldown = 0.5
+                        break
+            
+            # Luego verificar recogidas
+            if interaction_cooldown <= 0:  # Solo si no acabamos de entregar
+                for job in active_jobs[:]:  # Usamos copia para modificar durante iteración
+                    if player.is_at_location(job["pickup"]):
+                        if player.can_pickup_job(job):
+                            if player.add_to_inventory(job):
+                                message = f"Recogido: {job['id']}"
+                                message_timer = 3
+                                interaction_cooldown = 0.5
+                                break
+                        else:
+                            message = "¡No tienes capacidad suficiente!"
+                            message_timer = 3
+                            break
     
-    # Obtener teclas presionadas
+    # Movimiento del jugador
     keys = pygame.key.get_pressed()
     dx, dy = 0, 0
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -234,21 +315,13 @@ while running:
     if keys[pygame.K_DOWN] or keys[pygame.K_s]:
         dy = 1
     
-    # Mover al jugador
     current_weather = weather["initial"]["condition"]
     weather_multiplier = {
-        "clear": 1.00,
-        "clouds": 0.98,
-        "rain_light": 0.90,
-        "rain": 0.85,
-        "storm": 0.75,
-        "fog": 0.88,
-        "wind": 0.92,
-        "heat": 0.90,
-        "cold": 0.92
+        "clear": 1.00, "clouds": 0.98, "rain_light": 0.90,
+        "rain": 0.85, "storm": 0.75, "fog": 0.88,
+        "wind": 0.92, "heat": 0.90, "cold": 0.92
     }.get(current_weather, 1.0)
     
-    # Obtener el multiplicador de superficie
     tile_x, tile_y = int(player.x), int(player.y)
     if 0 <= tile_y < len(tiles) and 0 <= tile_x < len(tiles[0]):
         tile_char = tiles[tile_y][tile_x]
@@ -256,18 +329,14 @@ while running:
     else:
         surface_multiplier = 1.0
     
-    # Mover al jugador
     if dx != 0 or dy != 0:
         player.move(dx, dy, dt, weather_multiplier, surface_multiplier, tiles)
     else:
-        # Si no se está moviendo, recuperar stamina
         player.recover_stamina(dt)
     
-    # Actualizar cámara para seguir al jugador
+    # Actualizar cámara
     camera_x = player.x * tile_size - screen_width // 2 + 150
     camera_y = player.y * tile_size - screen_height // 2
-    
-    # Limitar la cámara para que no se salga del mapa
     camera_x = max(0, min(camera_x, cols * tile_size - screen_width + 300))
     camera_y = max(0, min(camera_y, rows * tile_size - screen_height))
     
@@ -277,14 +346,11 @@ while running:
     # Dibujar mapa
     for y, row in enumerate(tiles):
         for x, char in enumerate(row):
-            color = colors.get(char, (100, 100, 255))  # default azul
+            color = colors.get(char, (100, 100, 255))
             rect = pygame.Rect(x * tile_size - camera_x, y * tile_size - camera_y, tile_size, tile_size)
             pygame.draw.rect(screen, color, rect)
-            
-            # Dibujar borde
             pygame.draw.rect(screen, (0, 0, 0), rect, 1)
             
-            # Dibujar nombre del tile (solo si es visible)
             if (0 <= rect.x < screen_width - 300 and 0 <= rect.y < screen_height):
                 if char in legend:
                     name = legend[char]["name"]
@@ -292,7 +358,7 @@ while running:
                     text_rect = text.get_rect(center=rect.center)
                     screen.blit(text, text_rect)
     
-    # Dibujar marcadores de trabajos
+    # Dibujar marcadores de trabajos (solo activos)
     draw_job_markers()
     
     # Dibujar jugador
@@ -300,8 +366,30 @@ while running:
     
     # Dibujar panel lateral
     draw_sidebar()
+    
+    # Dibujar mensaje temporal
+    if message:
+        msg_surface = font_medium.render(message, True, (0, 0, 0))
+        screen.blit(msg_surface, (10, 10))
+    
+    # Dibujar indicador de interacción
+    nearby_active = False
+    for job in active_jobs:
+        if (player.is_at_location(job["pickup"]) and job not in player.inventory) or \
+           (job in player.inventory and player.is_at_location(job["dropoff"])):
+            nearby_active = True
+            break
+    
+    if nearby_active and interaction_cooldown <= 0:
+        hint_text = font_small.render("Presiona E para interactuar", True, (255, 255, 255))
+        hint_bg = pygame.Rect(player.x * tile_size - camera_x - 70, 
+                             player.y * tile_size - camera_y - 25, 
+                             140, 20)
+        pygame.draw.rect(screen, (0, 0, 0, 128), hint_bg, border_radius=5)
+        screen.blit(hint_text, (player.x * tile_size - camera_x - 65, 
+                               player.y * tile_size - camera_y - 20))
 
     pygame.display.flip()
-    clock.tick(60)  # Aumentamos a 60 FPS para animaciones más suaves
+    clock.tick(60)
 
 pygame.quit()

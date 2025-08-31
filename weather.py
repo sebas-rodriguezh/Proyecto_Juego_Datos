@@ -246,3 +246,5 @@ class Weather:
         self.transition_progress = state["transition_progress"]
         self.in_transition = state["in_transition"]
         self.weather_data = state["weather_data"]
+        
+        
