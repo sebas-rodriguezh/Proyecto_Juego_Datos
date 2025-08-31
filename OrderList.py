@@ -198,9 +198,8 @@ def probar_metodos_simples():
     print("---------Prueba from_api_response---------")
     
     # Simular respuesta de API
-    base_url = "https://tigerds-api.kindflower-ccaf48b6.eastus.azurecontainerapps.io"   
 
-    data3 = APIManager(base_url).get_jobs()
+    data3 = APIManager.get_jobs()
 
 
     lista_desde_api = OrderList.from_api_response(data3)
