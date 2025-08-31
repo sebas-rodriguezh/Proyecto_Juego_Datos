@@ -199,10 +199,9 @@ def probar_metodos_simples():
     
     # Simular respuesta de API
 
-    data3 = APIManager.get_jobs()
+    data3 = APIManager()
 
-
-    lista_desde_api = OrderList.from_api_response(data3)
+    lista_desde_api = OrderList.from_api_response(data3.get_jobs())
 
     #print([o for o in lista_desde_api])
 
