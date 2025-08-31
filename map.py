@@ -55,12 +55,9 @@ class Map:
 
 # --- SOLO PARA PROBAR ---
 if __name__ == "__main__":
-    base_url = "https://tigerds-api.kindflower-ccaf48b6.eastus.azurecontainerapps.io"
-    api = APIManager(base_url)
+    api = APIManager()   
 
-    # Obtener el mapa desde la API
-    map_json = api.get_map_data()
 
     # Crear y ejecutar el mapa
-    game_map = Map(map_json, tile_size=20)
+    game_map = Map(api.get_map_data(), tile_size=20)
     game_map.run()
