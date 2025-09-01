@@ -46,18 +46,6 @@ except:
     font_medium = pygame.font.SysFont("Arial", 14)
     font_large = pygame.font.SysFont("Arial", 18, bold=True)
 
-# Colores según la leyenda
-colors = {}
-for char, info in game_map.legend.items():
-    if info["name"] == "street":
-        colors[char] = (200, 200, 200)
-    elif info["name"] == "building":
-        colors[char] = (50, 50, 50)
-    elif info["name"] == "park":
-        colors[char] = (100, 200, 100)
-    else:
-        colors[char] = (100, 100, 255)
-
 # Colores para los trabajos
 job_colors = [
     (255, 100, 100), (100, 100, 255), (255, 255, 100),
@@ -184,7 +172,8 @@ def draw_sidebar():
     
     y_pos = screen_height - 130
     for char, info in game_map.legend.items():
-        pygame.draw.rect(screen, colors[char], (cols * game_map.tile_size + 10, y_pos, 15, 15))
+        color = game_map.COLORS.get(char, (100, 100, 255))  # Usar colores de la clase Map
+        pygame.draw.rect(screen, color, (cols * game_map.tile_size + 10, y_pos, 15, 15))
         name = font_small.render(info["name"].title(), True, (0, 0, 0))
         screen.blit(name, (cols * game_map.tile_size + 30, y_pos))
         y_pos += 20
@@ -339,21 +328,14 @@ while running:
     # Dibujar
     screen.fill((255, 255, 255))
 
-    # Dibujar mapa usando la clase Map
+    # Dibujar mapa usando la clase Map - VERSIÓN SIMPLIFICADA
     for y, row in enumerate(game_map.tiles):
         for x, char in enumerate(row):
-            color = colors.get(char, (100, 100, 255))
+            color = game_map.COLORS.get(char, (100, 100, 255))  # Usar colores de la clase Map
             rect = pygame.Rect(x * game_map.tile_size - camera_x, y * game_map.tile_size - camera_y, 
                              game_map.tile_size, game_map.tile_size)
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, (0, 0, 0), rect, 1)
-            
-            if (0 <= rect.x < screen_width - 300 and 0 <= rect.y < screen_height):
-                if char in game_map.legend:
-                    name = game_map.legend[char]["name"]
-                    text = font_small.render(name[0].upper(), True, (0, 0, 0))  
-                    text_rect = text.get_rect(center=rect.center)
-                    screen.blit(text, text_rect)
     
     # Dibujar marcadores de trabajos (solo activos)
     draw_job_markers()
