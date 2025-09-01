@@ -129,19 +129,23 @@ class Player:
                 
         return sprites
     
-    # El resto de los métodos se mantienen igual...
-    def move(self, dx, dy, dt, weather_multiplier, surface_multiplier, tiles):
+    def move(self, dx, dy, dt, weather_multiplier, surface_multiplier, tiles, weather_stamina_consumption=0):
+        """Mueve al jugador con los multiplicadores de clima y superficie"""
         if self.state == "exhausted":
             return False
             
+        # Calcular velocidad con todos los multiplicadores
         speed = self.speed * weather_multiplier * surface_multiplier
         
+        # Reducir velocidad si está cansado
         if self.state == "tired":
             speed *= 0.8
             
+        # Calcular nueva posición
         new_x = self.x + dx * speed * dt
         new_y = self.y + dy * speed * dt
         
+        # Actualizar dirección
         if dx > 0:
             self.direction = "right"
         elif dx < 0:
@@ -151,11 +155,14 @@ class Player:
         elif dy < 0:
             self.direction = "up"
             
+        # Actualizar posición
         self.x = new_x
         self.y = new_y
         
-        self.consume_stamina(dt)
+        # Consumir stamina (incluyendo el consumo adicional por clima)
+        self.consume_stamina(dt, weather_stamina_consumption)
         
+        # Actualizar animación
         self.animation_time += dt
         if self.animation_time >= self.animation_speed:
             self.animation_time = 0
@@ -163,14 +170,22 @@ class Player:
             
         return True
     
-    def consume_stamina(self, dt):
+    def consume_stamina(self, dt, weather_consumption=0):
+        """Consume stamina basado en movimiento, peso y condiciones climáticas"""
+        # Consumo base por movimiento
         consumption = 1 * dt
         
+        # Consumo adicional por clima
+        consumption += weather_consumption * dt
+        
+        # Consumo adicional por peso excesivo
         if self.current_weight > 3:
             consumption += 0.2 * (self.current_weight - 3) * dt
             
+        # Aplicar consumo
         self.stamina -= consumption
         
+        # Actualizar estado basado en stamina
         if self.stamina <= 0:
             self.state = "exhausted"
             self.stamina = 0
@@ -180,20 +195,25 @@ class Player:
             self.state = "normal"
     
     def recover_stamina(self, dt, at_rest_point=False):
-        recovery_rate = 5
+        """Recupera stamina cuando el jugador está quieto"""
+        recovery_rate = 5  # Tasa base de recuperación
         if at_rest_point:
-            recovery_rate = 10
+            recovery_rate = 10  # Recuperación más rápida en puntos de descanso
             
         self.stamina += recovery_rate * dt
+        
+        # Limitar stamina al máximo
         if self.stamina > 100:
             self.stamina = 100
             
+        # Actualizar estado
         if self.stamina <= 30:
             self.state = "tired"
         else:
             self.state = "normal"
     
     def add_to_inventory(self, job):
+        """Añade un trabajo al inventario si hay capacidad"""
         if self.current_weight + job["weight"] <= self.max_weight:
             self.inventory.append(job)
             self.current_weight += job["weight"]
@@ -201,43 +221,60 @@ class Player:
         return False
     
     def remove_from_inventory(self, job_id):
+        """Elimina un trabajo del inventario y lo marca como completado"""
         for i, job in enumerate(self.inventory):
             if job["id"] == job_id:
                 self.current_weight -= job["weight"]
                 self.completed_orders.append(job)
                 self.inventory.pop(i)
+                
+                # Aumentar reputación por entrega exitosa
                 self.reputation = min(100, self.reputation + 5)
                 return True
         return False
     
     def can_pickup_job(self, job):
+        """Verifica si el jugador puede cargar un trabajo adicional"""
         return self.current_weight + job["weight"] <= self.max_weight
     
     def is_at_location(self, location):
+        """Verifica si el jugador está en una ubicación específica"""
         return int(self.x) == location[0] and int(self.y) == location[1]
     
     def get_nearby_jobs(self, jobs, max_distance=1):
+        """Obtiene trabajos cercanos al jugador"""
         nearby_jobs = []
         for job in jobs:
+            # Calcular distancia Manhattan a los puntos de recogida y entrega
             pickup_dist = abs(int(self.x) - job["pickup"][0]) + abs(int(self.y) - job["pickup"][1])
             dropoff_dist = abs(int(self.x) - job["dropoff"][0]) + abs(int(self.y) - job["dropoff"][1])
             
+            # Añadir si está dentro de la distancia máxima
             if pickup_dist <= max_distance or dropoff_dist <= max_distance:
                 nearby_jobs.append(job)
                 
         return nearby_jobs
     
     def draw(self, screen, camera_x=0, camera_y=0):
+        """Dibuja al jugador en la pantalla"""
+        # Obtener sprite actual según dirección y frame de animación
         sprite = self.sprite_sheet[self.direction][self.current_frame]
         
+        # Calcular posición en pantalla
         screen_x = (self.x - camera_x) * self.tile_size
         screen_y = (self.y - camera_y) * self.tile_size
         
+        # Dibujar sprite
         screen.blit(sprite, (screen_x, screen_y))
         
+        # Dibujar barra de stamina
         bar_width = 20 * self.scale_factor
         bar_height = 3 * self.scale_factor
+        
+        # Fondo de la barra
         pygame.draw.rect(screen, (100, 100, 100), 
                         (screen_x, screen_y - 10, bar_width, bar_height))
+        
+        # Barra de stamina (verde)
         pygame.draw.rect(screen, (0, 255, 0), 
                         (screen_x, screen_y - 10, bar_width * (self.stamina / 100), bar_height))

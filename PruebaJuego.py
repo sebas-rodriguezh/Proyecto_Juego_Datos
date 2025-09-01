@@ -2,9 +2,10 @@ import pygame
 import math
 from datetime import datetime
 from Player import Player
-from OrderList import OrderList
-from map import Map  # Tu clase Map existente
-from api_manager import APIManager  # Tu clase APIManager existente
+from map import Map
+from api_manager import APIManager
+from weather import Weather
+from game_time import GameTime  # Importamos la nueva clase de tiempo
 
 # Configuración inicial
 api = APIManager()
@@ -20,7 +21,6 @@ except Exception as e:
 
 # Extraer información
 jobs = jobs_data["data"]  # Lista original de trabajos
-weather = weather_data["data"]
 
 # Lista para trabajos activos (que pueden ser recogidos)
 active_jobs = jobs.copy()
@@ -29,7 +29,7 @@ completed_jobs = []
 
 # Inicializar pygame y crear el mapa
 pygame.init()
-game_map = Map(map_data, tile_size=32)  # Usamos tu clase Map
+game_map = Map(map_data, tile_size=32)
 rows, cols = game_map.height, game_map.width
 screen_width = cols * game_map.tile_size + 300
 screen_height = rows * game_map.tile_size
@@ -41,10 +41,12 @@ try:
     font_small = pygame.font.Font(None, 12)
     font_medium = pygame.font.Font(None, 14)
     font_large = pygame.font.Font(None, 18)
+    font_xlarge = pygame.font.Font(None, 24)
 except:
     font_small = pygame.font.SysFont("Arial", 12)
     font_medium = pygame.font.SysFont("Arial", 14)
     font_large = pygame.font.SysFont("Arial", 18, bold=True)
+    font_xlarge = pygame.font.SysFont("Arial", 24, bold=True)
 
 # Colores para los trabajos
 job_colors = [
@@ -52,17 +54,15 @@ job_colors = [
     (255, 100, 255), (100, 255, 255)
 ]
 
-# Colores para las condiciones climáticas
-weather_colors = {
-    "clear": (255, 255, 100), "clouds": (200, 200, 220),
-    "rain_light": (150, 150, 255), "rain": (100, 100, 255),
-    "storm": (150, 50, 200), "fog": (180, 180, 200),
-    "wind": (200, 220, 255), "heat": (255, 150, 50),
-    "cold": (150, 220, 255)
-}
-
 # Crear jugador
 player = Player(cols // 2, rows // 2, game_map.tile_size, game_map.legend)
+
+# Crear sistema de clima
+weather_system = Weather(api)
+
+# Crear sistema de tiempo de juego (15 minutos de jornada)
+game_time = GameTime(total_duration_min=15)
+game_time.start()
 
 # Cámara para seguir al jugador
 camera_x, camera_y = 0, 0
@@ -72,7 +72,12 @@ selected_job = None
 interaction_cooldown = 0
 message = ""
 message_timer = 0
-total_earnings = 0  # Dinero total ganado
+total_earnings = 0
+game_over = False
+victory = False
+
+# Meta de ingresos (podría venir del mapa)
+income_goal = map_data.get("goal", 3000)
 
 # Función para dibujar el panel lateral
 def draw_sidebar():
@@ -87,33 +92,41 @@ def draw_sidebar():
     earnings_text = font_medium.render(f"Ganancias: ${total_earnings}", True, (0, 100, 0))
     screen.blit(earnings_text, (cols * game_map.tile_size + 150, 12))
     
+    # Tiempo restante
+    time_text = font_medium.render(f"Tiempo: {game_time.get_remaining_time_formatted()}", True, (0, 0, 0))
+    screen.blit(time_text, (cols * game_map.tile_size + 10, 35))
+    
+    # Meta de ingresos
+    goal_text = font_small.render(f"Meta: ${income_goal}", True, (0, 0, 0))
+    screen.blit(goal_text, (cols * game_map.tile_size + 150, 35))
+    
     # Información del jugador
     player_title = font_medium.render("Estado del Repartidor:", True, (0, 0, 0))
-    screen.blit(player_title, (cols * game_map.tile_size + 10, 40))
+    screen.blit(player_title, (cols * game_map.tile_size + 10, 60))
     
     # Barra de resistencia
     stamina_text = font_small.render(f"Resistencia: {int(player.stamina)}/100", True, (0, 0, 0))
-    screen.blit(stamina_text, (cols * game_map.tile_size + 10, 65))
-    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 80, 150, 15))
-    pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, 80, 150 * (player.stamina / 100), 15))
+    screen.blit(stamina_text, (cols * game_map.tile_size + 10, 85))
+    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 100, 150, 15))
+    pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, 100, 150 * (player.stamina / 100), 15))
     
     # Reputación
     reputation_text = font_small.render(f"Reputación: {player.reputation}/100", True, (0, 0, 0))
-    screen.blit(reputation_text, (cols * game_map.tile_size + 10, 100))
-    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 115, 150, 15))
-    pygame.draw.rect(screen, (0, 100, 200), (cols * game_map.tile_size + 10, 115, 150 * (player.reputation / 100), 15))
+    screen.blit(reputation_text, (cols * game_map.tile_size + 10, 120))
+    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 135, 150, 15))
+    pygame.draw.rect(screen, (0, 100, 200), (cols * game_map.tile_size + 10, 135, 150 * (player.reputation / 100), 15))
     
     # Peso actual
     weight_text = font_small.render(f"Peso: {player.current_weight}/{player.max_weight}", True, (0, 0, 0))
-    screen.blit(weight_text, (cols * game_map.tile_size + 10, 135))
+    screen.blit(weight_text, (cols * game_map.tile_size + 10, 155))
     
     # Inventario actual
     inventory_title = font_medium.render("Inventario:", True, (0, 0, 0))
-    screen.blit(inventory_title, (cols * game_map.tile_size + 10, 160))
+    screen.blit(inventory_title, (cols * game_map.tile_size + 10, 180))
     
     if player.inventory:
         for i, job in enumerate(player.inventory):
-            y_pos = 185 + i * 40
+            y_pos = 205 + i * 40
             pygame.draw.rect(screen, (200, 255, 200), (cols * game_map.tile_size + 10, y_pos, 280, 35))
             pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, y_pos, 280, 35), 2)
             
@@ -124,25 +137,30 @@ def draw_sidebar():
             screen.blit(destination, (cols * game_map.tile_size + 15, y_pos + 20))
     else:
         no_items = font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
-        screen.blit(no_items, (cols * game_map.tile_size + 15, 185))
+        screen.blit(no_items, (cols * game_map.tile_size + 15, 205))
     
     # Información del clima
     weather_title = font_medium.render("Condición Climática:", True, (0, 0, 0))
-    weather_y_pos = 250 if not player.inventory else 185 + len(player.inventory) * 40 + 10
+    weather_y_pos = 270 if not player.inventory else 205 + len(player.inventory) * 40 + 10
     screen.blit(weather_title, (cols * game_map.tile_size + 10, weather_y_pos))
     
-    current_weather = weather["initial"]["condition"]
-    pygame.draw.circle(screen, weather_colors[current_weather], (cols * game_map.tile_size + 40, weather_y_pos + 35), 15)
+    # Dibujar el indicador del clima usando la clase Weather
+    weather_system.draw(screen, cols * game_map.tile_size + 40, weather_y_pos + 35)
     
-    weather_text = font_small.render(current_weather.replace("_", " ").title(), True, (0, 0, 0))
+    # Información textual del clima
+    condition_name = weather_system.current_condition.value.replace("_", " ").title()
+    weather_text = font_small.render(condition_name, True, (0, 0, 0))
     screen.blit(weather_text, (cols * game_map.tile_size + 60, weather_y_pos + 25))
     
-    intensity_text = font_small.render(f"Intensidad: {weather['initial']['intensity']:.2f}", True, (0, 0, 0))
+    intensity_text = font_small.render(f"Intensidad: {weather_system.current_intensity:.2f}", True, (0, 0, 0))
     screen.blit(intensity_text, (cols * game_map.tile_size + 60, weather_y_pos + 40))
+    
+    speed_text = font_small.render(f"Velocidad: x{weather_system.current_multiplier:.2f}", True, (0, 0, 0))
+    screen.blit(speed_text, (cols * game_map.tile_size + 60, weather_y_pos + 55))
     
     # Lista de trabajos disponibles
     jobs_title = font_medium.render("Trabajos Disponibles:", True, (0, 0, 0))
-    jobs_y_pos = weather_y_pos + 70
+    jobs_y_pos = weather_y_pos + 85
     screen.blit(jobs_title, (cols * game_map.tile_size + 10, jobs_y_pos))
     
     for i, job in enumerate(active_jobs):
@@ -172,7 +190,7 @@ def draw_sidebar():
     
     y_pos = screen_height - 130
     for char, info in game_map.legend.items():
-        color = game_map.COLORS.get(char, (100, 100, 255))  # Usar colores de la clase Map
+        color = game_map.COLORS.get(char, (100, 100, 255))
         pygame.draw.rect(screen, color, (cols * game_map.tile_size + 10, y_pos, 15, 15))
         name = font_small.render(info["name"].title(), True, (0, 0, 0))
         screen.blit(name, (cols * game_map.tile_size + 30, y_pos))
@@ -219,6 +237,51 @@ def draw_job_markers():
                              dropoff_y * game_map.tile_size + game_map.tile_size // 2 - camera_y), 
                             2)
 
+# Función para verificar condiciones de victoria/derrota
+def check_game_conditions():
+    global game_over, victory
+    
+    # Verificar derrota por reputación
+    if player.reputation < 20:
+        game_over = True
+        return "Derrota: Reputación muy baja"
+    
+    # Verificar derrota por tiempo
+    if game_time.is_time_up() and total_earnings < income_goal:
+        game_over = True
+        return "Derrota: Tiempo agotado"
+    
+    # Verificar victoria
+    if total_earnings >= income_goal:
+        victory = True
+        game_over = True
+        return "¡Victoria! Meta alcanzada"
+    
+    return None
+
+# Función para reiniciar el juego
+def restart_game():
+    global player, active_jobs, completed_jobs, total_earnings
+    global game_over, victory, game_time, weather_system, camera_x, camera_y
+    
+    # Reiniciar jugador
+    player = Player(cols // 2, rows // 2, game_map.tile_size, game_map.legend)
+    
+    # Reiniciar listas de trabajos
+    active_jobs = jobs.copy()
+    completed_jobs = []
+    
+    # Reiniciar variables de juego
+    total_earnings = 0
+    game_over = False
+    victory = False
+    camera_x, camera_y = 0, 0
+    
+    # Reiniciar sistemas
+    game_time = GameTime(total_duration_min=15)
+    game_time.start()
+    weather_system = Weather(api)
+
 # Bucle principal
 running = True
 clock = pygame.time.Clock()
@@ -228,6 +291,14 @@ while running:
     current_time = pygame.time.get_ticks()
     dt = (current_time - last_time) / 1000.0
     last_time = current_time
+    
+    # Actualizar sistemas
+    if not game_over:
+        game_time.update(dt)
+        weather_system.update(dt)
+    
+    # Verificar condiciones del juego
+    game_status = check_game_conditions()
     
     if interaction_cooldown > 0:
         interaction_cooldown -= dt
@@ -245,8 +316,8 @@ while running:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             
             if mouse_x > cols * game_map.tile_size:
-                weather_y_pos = 250 if not player.inventory else 185 + len(player.inventory) * 40 + 10
-                jobs_y_pos = weather_y_pos + 70
+                weather_y_pos = 270 if not player.inventory else 205 + len(player.inventory) * 40 + 10
+                jobs_y_pos = weather_y_pos + 85
                 job_index = (mouse_y - jobs_y_pos - 25) // 70
                 
                 if 0 <= job_index < len(active_jobs):
@@ -255,9 +326,9 @@ while running:
                     message_timer = 3
         
         # Tecla E para interactuar (recoger/entregar)
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and interaction_cooldown <= 0:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and interaction_cooldown <= 0 and not game_over:
             # Primero verificar entregas (tiene prioridad)
-            for job in player.inventory[:]:  # Usamos copia para modificar durante iteración
+            for job in player.inventory[:]:
                 if player.is_at_location(job["dropoff"]):
                     if player.remove_from_inventory(job["id"]):
                         # Añadir a trabajos completados y remover de activos
@@ -274,8 +345,8 @@ while running:
                         break
             
             # Luego verificar recogidas
-            if interaction_cooldown <= 0:  # Solo si no acabamos de entregar
-                for job in active_jobs[:]:  # Usamos copia para modificar durante iteración
+            if interaction_cooldown <= 0:
+                for job in active_jobs[:]:
                     if player.is_at_location(job["pickup"]):
                         if player.can_pickup_job(job):
                             if player.add_to_inventory(job):
@@ -287,37 +358,40 @@ while running:
                             message = "¡No tienes capacidad suficiente!"
                             message_timer = 3
                             break
+        
+        # Tecla R para reiniciar el juego
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_r and game_over:
+            restart_game()
     
-    # Movimiento del jugador
-    keys = pygame.key.get_pressed()
-    dx, dy = 0, 0
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        dx = -1
-    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        dx = 1
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        dy = -1
-    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        dy = 1
-    
-    current_weather = weather["initial"]["condition"]
-    weather_multiplier = {
-        "clear": 1.00, "clouds": 0.98, "rain_light": 0.90,
-        "rain": 0.85, "storm": 0.75, "fog": 0.88,
-        "wind": 0.92, "heat": 0.90, "cold": 0.92
-    }.get(current_weather, 1.0)
-    
-    tile_x, tile_y = int(player.x), int(player.y)
-    if 0 <= tile_y < len(game_map.tiles) and 0 <= tile_x < len(game_map.tiles[0]):
-        tile_char = game_map.tiles[tile_y][tile_x]
-        surface_multiplier = game_map.legend[tile_char].get("surface_weight", 1.0)
-    else:
-        surface_multiplier = 1.0
-    
-    if dx != 0 or dy != 0:
-        player.move(dx, dy, dt, weather_multiplier, surface_multiplier, game_map.tiles)
-    else:
-        player.recover_stamina(dt)
+    # Movimiento del jugador (solo si el juego no ha terminado)
+    if not game_over:
+        keys = pygame.key.get_pressed()
+        dx, dy = 0, 0
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            dx = -1
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            dx = 1
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
+            dy = -1
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            dy = 1
+        
+        # Obtener multiplicadores del sistema de clima
+        weather_multiplier = weather_system.get_speed_multiplier()
+        weather_stamina_consumption = weather_system.get_stamina_consumption()
+        
+        tile_x, tile_y = int(player.x), int(player.y)
+        if 0 <= tile_y < len(game_map.tiles) and 0 <= tile_x < len(game_map.tiles[0]):
+            tile_char = game_map.tiles[tile_y][tile_x]
+            surface_multiplier = game_map.legend[tile_char].get("surface_weight", 1.0)
+        else:
+            surface_multiplier = 1.0
+        
+        if dx != 0 or dy != 0:
+            # Pasar el consumo adicional de stamina al método move
+            player.move(dx, dy, dt, weather_multiplier, surface_multiplier, game_map.tiles, weather_stamina_consumption)
+        else:
+            player.recover_stamina(dt)
     
     # Actualizar cámara
     camera_x = player.x * game_map.tile_size - screen_width // 2 + 150
@@ -328,16 +402,16 @@ while running:
     # Dibujar
     screen.fill((255, 255, 255))
 
-    # Dibujar mapa usando la clase Map - VERSIÓN SIMPLIFICADA
+    # Dibujar mapa
     for y, row in enumerate(game_map.tiles):
         for x, char in enumerate(row):
-            color = game_map.COLORS.get(char, (100, 100, 255))  # Usar colores de la clase Map
+            color = game_map.COLORS.get(char, (100, 100, 255))
             rect = pygame.Rect(x * game_map.tile_size - camera_x, y * game_map.tile_size - camera_y, 
                              game_map.tile_size, game_map.tile_size)
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, (0, 0, 0), rect, 1)
     
-    # Dibujar marcadores de trabajos (solo activos)
+    # Dibujar marcadores de trabajos
     draw_job_markers()
     
     # Dibujar jugador
@@ -351,22 +425,42 @@ while running:
         msg_surface = font_medium.render(message, True, (0, 0, 0))
         screen.blit(msg_surface, (10, 10))
     
-    # Dibujar indicador de interacción
-    nearby_active = False
-    for job in active_jobs:
-        if (player.is_at_location(job["pickup"]) and job not in player.inventory) or \
-           (job in player.inventory and player.is_at_location(job["dropoff"])):
-            nearby_active = True
-            break
+    # Dibujar mensaje de fin de juego
+    if game_over:
+        overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 128))
+        screen.blit(overlay, (0, 0))
+        
+        if victory:
+            result_text = font_xlarge.render("¡VICTORIA!", True, (0, 255, 0))
+            reason_text = font_large.render(f"Has ganado ${total_earnings}", True, (255, 255, 255))
+        else:
+            result_text = font_xlarge.render("DERROTA", True, (255, 0, 0))
+            reason_text = font_large.render(game_status, True, (255, 255, 255))
+        
+        screen.blit(result_text, (screen_width // 2 - result_text.get_width() // 2, screen_height // 2 - 50))
+        screen.blit(reason_text, (screen_width // 2 - reason_text.get_width() // 2, screen_height // 2))
+        
+        restart_text = font_medium.render("Presiona R para reiniciar", True, (255, 255, 255))
+        screen.blit(restart_text, (screen_width // 2 - restart_text.get_width() // 2, screen_height // 2 + 50))
     
-    if nearby_active and interaction_cooldown <= 0:
-        hint_text = font_small.render("Presiona E para interactuar", True, (255, 255, 255))
-        hint_bg = pygame.Rect(player.x * game_map.tile_size - camera_x - 70, 
-                             player.y * game_map.tile_size - camera_y - 25, 
-                             140, 20)
-        pygame.draw.rect(screen, (0, 0, 0, 128), hint_bg, border_radius=5)
-        screen.blit(hint_text, (player.x * game_map.tile_size - camera_x - 65, 
-                               player.y * game_map.tile_size - camera_y - 20))
+    # Dibujar indicador de interacción (solo si el juego no ha terminado)
+    if not game_over:
+        nearby_active = False
+        for job in active_jobs:
+            if (player.is_at_location(job["pickup"]) and job not in player.inventory) or \
+               (job in player.inventory and player.is_at_location(job["dropoff"])):
+                nearby_active = True
+                break
+        
+        if nearby_active and interaction_cooldown <= 0:
+            hint_text = font_small.render("Presiona E para interactuar", True, (255, 255, 255))
+            hint_bg = pygame.Rect(player.x * game_map.tile_size - camera_x - 70, 
+                                 player.y * game_map.tile_size - camera_y - 25, 
+                                 140, 20)
+            pygame.draw.rect(screen, (0, 0, 0, 128), hint_bg, border_radius=5)
+            screen.blit(hint_text, (player.x * game_map.tile_size - camera_x - 65, 
+                                   player.y * game_map.tile_size - camera_y - 20))
 
     pygame.display.flip()
     clock.tick(60)

@@ -1,250 +1,242 @@
-import pygame
+# weather.py
 import random
-import time
-import math
-from api_manager import APIManager  # Importar tu clase APIManager
+import pygame
+import requests
+import json
+import os
+from enum import Enum
+
+class WeatherCondition(Enum):
+    CLEAR = "clear"
+    CLOUDS = "clouds"
+    RAIN_LIGHT = "rain_light"
+    RAIN = "rain"
+    STORM = "storm"
+    FOG = "fog"
+    WIND = "wind"
+    HEAT = "heat"
+    COLD = "cold"
 
 class Weather:
-    # Definición de condiciones climáticas y sus multiplicadores base
-    CONDITIONS = {
-        "clear": {"name": "Despejado", "multiplier": 1.00, "stamina_cost": 0.0},
-        "clouds": {"name": "Nublado", "multiplier": 0.98, "stamina_cost": 0.0},
-        "rain_light": {"name": "Lluvia ligera", "multiplier": 0.90, "stamina_cost": 0.1},
-        "rain": {"name": "Lluvia", "multiplier": 0.85, "stamina_cost": 0.1},
-        "storm": {"name": "Tormenta", "multiplier": 0.75, "stamina_cost": 0.3},
-        "fog": {"name": "Niebla", "multiplier": 0.88, "stamina_cost": 0.0},
-        "wind": {"name": "Viento", "multiplier": 0.92, "stamina_cost": 0.1},
-        "heat": {"name": "Calor extremo", "multiplier": 0.90, "stamina_cost": 0.2},
-        "cold": {"name": "Frío extremo", "multiplier": 0.92, "stamina_cost": 0.0}
+    # Multiplicadores de velocidad para cada condición climática
+    SPEED_MULTIPLIERS = {
+        WeatherCondition.CLEAR: 1.00,
+        WeatherCondition.CLOUDS: 0.98,
+        WeatherCondition.RAIN_LIGHT: 0.90,
+        WeatherCondition.RAIN: 0.85,
+        WeatherCondition.STORM: 0.75,
+        WeatherCondition.FOG: 0.88,
+        WeatherCondition.WIND: 0.92,
+        WeatherCondition.HEAT: 0.90,
+        WeatherCondition.COLD: 0.92
     }
     
-    def __init__(self, api_manager, use_api=True):
+    # Colores para representar cada condición climática
+    WEATHER_COLORS = {
+        WeatherCondition.CLEAR: (255, 255, 100),
+        WeatherCondition.CLOUDS: (200, 200, 220),
+        WeatherCondition.RAIN_LIGHT: (150, 150, 255),
+        WeatherCondition.RAIN: (100, 100, 255),
+        WeatherCondition.STORM: (150, 50, 200),
+        WeatherCondition.FOG: (180, 180, 200),
+        WeatherCondition.WIND: (200, 220, 255),
+        WeatherCondition.HEAT: (255, 150, 50),
+        WeatherCondition.COLD: (150, 220, 255)
+    }
+    
+    def __init__(self, api_manager, transition_duration=3.0):
         self.api_manager = api_manager
-        self.use_api = use_api
-        self.weather_data = None
+        self.transition_duration = transition_duration
         
-        # Cargar datos climáticos
-        self._load_weather_data()
+        # Cargar datos del clima
+        self.weather_data = self.load_weather_data()
         
-        # Estado actual del clima (usando los datos iniciales de la API)
-        self.current_condition = self.weather_data["initial"]["condition"]
-        self.current_intensity = self.weather_data["initial"]["intensity"]
-        self.current_duration = random.randint(45, 60)  # Duración aleatoria entre 45-60 segundos
+        # Estado actual del clima
+        self.current_condition = WeatherCondition(self.weather_data["data"]["initial"]["condition"])
+        self.current_intensity = self.weather_data["data"]["initial"]["intensity"]
+        self.current_multiplier = self.SPEED_MULTIPLIERS[self.current_condition]
         
-        # Para transiciones suaves
+        # Estado objetivo (próximo clima)
         self.target_condition = self.current_condition
         self.target_intensity = self.current_intensity
-        self.transition_progress = 0
-        self.transition_duration = 4  # segundos para completar la transición
+        self.target_multiplier = self.current_multiplier
         
-        # Tiempo de inicio del burst actual
-        self.burst_start_time = time.time()
+        # Temporizadores
+        self.burst_timer = 0
+        self.transition_timer = 0
+        self.burst_duration = random.randint(1, 2)  # Duración aleatoria entre 45-60 segundos
         
-        # Bandera para indicar si estamos en transición
-        self.in_transition = False
+        # Matriz de transición de Markov
+        self.transition_matrix = self.weather_data["data"]["transition"]
         
-    def _load_weather_data(self):
-        """Carga los datos climáticos desde la API o archivo local"""
+        # Para transiciones suaves
+        self.is_transitioning = False
+        self.transition_start_multiplier = self.current_multiplier
+        
+        # Historial de cambios climáticos
+        self.weather_history = []
+        
+    def load_weather_data(self):
+        """Carga los datos del clima desde la API o desde caché local"""
         try:
-            if self.use_api:
-                # Intentar obtener datos de la API
-                api_response = self.api_manager.get_weather_data()
-                
-                # Verificar que la respuesta tenga la estructura esperada
-                if (api_response and "version" in api_response and 
-                    "data" in api_response and "initial" in api_response["data"]):
-                    self.weather_data = api_response["data"]
-                    print("Datos climáticos obtenidos desde la API")
-                else:
-                    raise Exception("Formato de respuesta de API inválido")
-            else:
-                raise Exception("Modo API desactivado")
-                
-        except Exception as e:
-            print(f"Error al cargar datos de la API: {e}. Usando datos locales...")
-            # Cargar desde archivo local o datos por defecto
-            self.weather_data = self._load_local_weather_data()
-    
-    def _load_local_weather_data(self):
-        """Carga datos climáticos desde archivo local o usa valores por defecto"""
-        # Esta función debería cargar desde /data/weather.json
-        # Por ahora usamos datos de ejemplo basados en el formato de la API
-        return {
-            "city": "TigerCity",
-            "initial": {"condition": "clear", "intensity": 0.0},
-            "conditions": ["clear", "clouds", "rain_light", "rain", "storm", "fog", "wind", "heat", "cold"],
-            "transition": {
-                "clear": {"clear": 0.6, "clouds": 0.3, "rain": 0.1},
-                "clouds": {"clear": 0.3, "clouds": 0.5, "rain": 0.2},
-                "rain": {"clouds": 0.4, "rain": 0.4, "storm": 0.2},
-                "rain_light": {"clouds": 0.4, "rain_light": 0.4, "rain": 0.2},
-                "storm": {"rain": 0.5, "clouds": 0.3, "storm": 0.2},
-                "fog": {"fog": 0.5, "clouds": 0.3, "clear": 0.2},
-                "wind": {"wind": 0.5, "clouds": 0.3, "clear": 0.2},
-                "heat": {"heat": 0.5, "clear": 0.3, "clouds": 0.2},
-                "cold": {"cold": 0.5, "clear": 0.3, "clouds": 0.2}
-            }
-        }
-    
-    def get_current_multiplier(self):
-        """Obtiene el multiplicador de velocidad actual, considerando transiciones"""
-        current_mult = self.CONDITIONS[self.current_condition]["multiplier"]
-        
-        if self.in_transition:
-            target_mult = self.CONDITIONS[self.target_condition]["multiplier"]
-            # Interpolación lineal durante la transición
-            return current_mult + (target_mult - current_mult) * self.transition_progress
-        
-        return current_mult
-    
-    def get_stamina_cost(self):
-        """Obtiene el costo adicional de resistencia por celda"""
-        return self.CONDITIONS[self.current_condition]["stamina_cost"] * self.current_intensity
-    
-    def update(self):
-        """Actualiza el estado del clima, debe ser llamado en cada frame del juego"""
-        current_time = time.time()
-        elapsed = current_time - self.burst_start_time
-        
-        # Comprobar si es tiempo de cambiar de condición climática
-        if elapsed >= self.current_duration and not self.in_transition:
-            self._start_transition()
-        
-        # Actualizar transición en curso
-        if self.in_transition:
-            self.transition_progress = min(1.0, (current_time - self.transition_start_time) / self.transition_duration)
+            weather_data = self.api_manager.get_weather()
             
-            # Si la transición está completa, finalizarla
-            if self.transition_progress >= 1.0:
-                self._end_transition()
+            # Guardar en caché local
+            os.makedirs("api_cache", exist_ok=True)
+            with open("api_cache/weather.json", "w") as f:
+                json.dump(weather_data, f)
+                
+            return weather_data
+        except requests.RequestException:
+            try:
+                with open("api_cache/weather.json", "r") as f:
+                    return json.load(f)
+            except FileNotFoundError:
+                return {
+                    "version": "1.0",
+                    "data": {
+                        "city": "TigerCity",
+                        "initial": {"condition": "clear", "intensity": 0.0},
+                        "conditions": ["clear", "clouds", "rain_light", "rain", "storm", "fog", "wind", "heat", "cold"],
+                        "transition": {
+                            "clear": {"clear": 0.6, "clouds": 0.3, "rain": 0.1},
+                            "clouds": {"clear": 0.3, "clouds": 0.5, "rain": 0.2},
+                            "rain": {"clouds": 0.4, "rain": 0.4, "storm": 0.2},
+                            "rain_light": {"clouds": 0.4, "rain_light": 0.4, "rain": 0.2},
+                            "storm": {"rain": 0.5, "clouds": 0.3, "storm": 0.2},
+                            "fog": {"fog": 0.5, "clouds": 0.3, "clear": 0.2},
+                            "wind": {"wind": 0.5, "clouds": 0.3, "clear": 0.2},
+                            "heat": {"heat": 0.5, "clear": 0.3, "clouds": 0.2},
+                            "cold": {"cold": 0.5, "clear": 0.3, "clouds": 0.2}
+                        }
+                    }
+                }
     
-    def _start_transition(self):
-        """Inicia una transición a una nueva condición climática"""
-        # Usar la matriz de transición de la API para generar el próximo clima
-        self.target_condition = self._get_next_condition()
-        self.target_intensity = random.uniform(0.1, 1.0)  # Intensidad aleatoria
+    def update(self, dt):
+        """Actualiza el estado del clima"""
+        # Actualizar temporizador de ráfaga
+        self.burst_timer += dt
         
-        # Duración aleatoria para el próximo burst (45-60 segundos)
-        next_duration = random.randint(45, 60)
+        # Si estamos en transición, actualizar el multiplicador
+        if self.is_transitioning:
+            self.transition_timer += dt
+            progress = min(1.0, self.transition_timer / self.transition_duration)
+            
+            # Interpolar suavemente entre el multiplicador inicial y el objetivo
+            self.current_multiplier = self.transition_start_multiplier + (
+                self.target_multiplier - self.transition_start_multiplier
+            ) * progress
+            
+            # Si la transición ha terminado
+            if progress >= 1.0:
+                self.complete_transition()
         
-        # Preparar para la transición
-        self.transition_start_time = time.time()
-        self.transition_progress = 0
-        self.in_transition = True
-        
-        # Guardar información del próximo burst
-        self.next_burst = {
-            "condition": self.target_condition,
-            "intensity": self.target_intensity,
-            "duration_sec": next_duration
-        }
+        # Si la ráfaga actual ha terminado y no estamos en transición
+        elif self.burst_timer >= self.burst_duration:
+            self.change_weather()
     
-    def _end_transition(self):
-        """Finaliza la transición y establece la nueva condición como actual"""
+    def complete_transition(self):
+        """Completa la transición climática"""
         self.current_condition = self.target_condition
         self.current_intensity = self.target_intensity
-        self.current_duration = self.next_burst["duration_sec"]
+        self.current_multiplier = self.target_multiplier
+        self.is_transitioning = False
         
-        # Reiniciar el temporizador
-        self.burst_start_time = time.time()
-        
-        # Finalizar la transición
-        self.in_transition = False
-        self.transition_progress = 0
-    
-    def _get_next_condition(self):
-        """Usa la matriz de transición de la API para determinar la próxima condición climática"""
-        current = self.current_condition
-        
-        # Obtener las probabilidades de transición desde los datos de la API
-        transition_matrix = self.weather_data.get("transition", {})
-        probabilities = transition_matrix.get(current, {"clear": 1.0})  # Por defecto claro
-        
-        # Convertir las probabilidades en una lista acumulativa
-        choices, weights = zip(*probabilities.items())
-        cumulative_weights = []
-        cumulative = 0
-        
-        for w in weights:
-            cumulative += w
-            cumulative_weights.append(cumulative)
-        
-        # Seleccionar una condición basada en las probabilidades
-        rand = random.random() * cumulative_weights[-1]
-        
-        for i, weight in enumerate(cumulative_weights):
-            if rand <= weight:
-                return choices[i]
-        
-        return "clear"  # Fallback
-    
-    def get_weather_info(self):
-        """Devuelve información sobre el clima actual para la UI"""
-        condition_info = self.CONDITIONS[self.current_condition]
-        
-        return {
-            "name": condition_info["name"],
-            "multiplier": self.get_current_multiplier(),
+        # Registrar en el historial
+        self.weather_history.append({
+            "condition": self.current_condition.value,
             "intensity": self.current_intensity,
-            "in_transition": self.in_transition,
-            "transition_progress": self.transition_progress if self.in_transition else 0,
-            "time_remaining": max(0, self.current_duration - (time.time() - self.burst_start_time)),
-            "condition_icon": self._get_weather_icon(),
-            "condition_code": self.current_condition
-        }
+            "duration": self.burst_duration
+        })
     
-    def _get_weather_icon(self):
-        """Devuelve el nombre de un icono para la condición actual"""
-        icons = {
-            "clear": "sun",
-            "clouds": "cloud",
-            "rain_light": "cloud-drizzle",
-            "rain": "cloud-rain",
-            "storm": "cloud-lightning",
-            "fog": "cloud-fog",
-            "wind": "wind",
-            "heat": "thermometer-sun",
-            "cold": "thermometer-snowflake"
-        }
-        return icons.get(self.current_condition, "sun")
-    
-    def get_weather_display_name(self):
-        """Devuelve el nombre para mostrar de la condición actual"""
-        return self.CONDITIONS[self.current_condition]["name"]
-    
-    def get_weather_effects(self):
-        """Devuelve los efectos actuales del clima para aplicar al jugador"""
-        return {
-            "speed_multiplier": self.get_current_multiplier(),
-            "stamina_cost": self.get_stamina_cost(),
-            "condition": self.current_condition,
-            "intensity": self.current_intensity
-        }
-    
-    def save_state(self):
-        """Guarda el estado actual del clima para persistencia"""
-        return {
-            "current_condition": self.current_condition,
-            "current_intensity": self.current_intensity,
-            "current_duration": self.current_duration,
-            "burst_start_time": self.burst_start_time,
-            "target_condition": self.target_condition,
-            "target_intensity": self.target_intensity,
-            "transition_progress": self.transition_progress,
-            "in_transition": self.in_transition,
-            "weather_data": self.weather_data
-        }
-    
-    def load_state(self, state):
-        """Carga un estado previamente guardado"""
-        self.current_condition = state["current_condition"]
-        self.current_intensity = state["current_intensity"]
-        self.current_duration = state["current_duration"]
-        self.burst_start_time = state["burst_start_time"]
-        self.target_condition = state["target_condition"]
-        self.target_intensity = state["target_intensity"]
-        self.transition_progress = state["transition_progress"]
-        self.in_transition = state["in_transition"]
-        self.weather_data = state["weather_data"]
+    def change_weather(self):
+        """Cambia el clima usando la cadena de Markov"""
+        # Reiniciar temporizador
+        self.burst_timer = 0
+        self.burst_duration = random.randint(1, 2)
         
+        # Obtener probabilidades de transición para el clima actual
+        current_condition_str = self.current_condition.value
+        transition_probs = self.transition_matrix.get(current_condition_str, {})
         
+        # Si no hay probabilidades definidas, usar valores por defecto
+        if not transition_probs:
+            transition_probs = {"clear": 0.6, "clouds": 0.3, "rain": 0.1}
+        
+        # Seleccionar el próximo clima basado en las probabilidades
+        rand_val = random.random()
+        cumulative_prob = 0
+        
+        for condition, prob in transition_probs.items():
+            cumulative_prob += prob
+            if rand_val <= cumulative_prob:
+                self.target_condition = WeatherCondition(condition)
+                break
+        
+        # Si no se seleccionó ningún clima, usar clear por defecto
+        if self.target_condition is None:
+            self.target_condition = WeatherCondition.CLEAR
+        
+        # Establecer intensidad aleatoria (0-1)
+        self.target_intensity = random.random()
+        
+        # Obtener multiplicador objetivo
+        self.target_multiplier = self.SPEED_MULTIPLIERS[self.target_condition]
+        
+        # Iniciar transición
+        self.is_transitioning = True
+        self.transition_timer = 0
+        self.transition_start_multiplier = self.current_multiplier
+    
+    def get_stamina_consumption(self):
+        """Calcula el consumo adicional de stamina basado en el clima actual"""
+        base_consumption = 0
+        
+        if self.current_condition in [WeatherCondition.RAIN, WeatherCondition.WIND]:
+            base_consumption += 0.1
+        elif self.current_condition == WeatherCondition.STORM:
+            base_consumption += 0.3
+        elif self.current_condition == WeatherCondition.HEAT:
+            base_consumption += 0.2
+        
+        # Ajustar por intensidad
+        return base_consumption * self.current_intensity
+    
+    def get_speed_multiplier(self):
+        """Devuelve el multiplicador de velocidad actual"""
+        return self.current_multiplier
+    
+    def draw(self, screen, x, y):
+        """Dibuja un indicador del clima actual"""
+        # Dibujar círculo con el color del clima actual
+        color = self.WEATHER_COLORS[self.current_condition]
+        pygame.draw.circle(screen, color, (x, y), 15)
+        pygame.draw.circle(screen, (0, 0, 0), (x, y), 15, 2)
+        
+        # Dibujar icono según el clima
+        self.draw_weather_icon(screen, x, y)
+    
+    def draw_weather_icon(self, screen, x, y):
+        """Dibuja el icono correspondiente al clima actual"""
+        if self.current_condition == WeatherCondition.CLEAR:
+            pygame.draw.circle(screen, (255, 255, 0), (x, y), 5)  # Sol
+        elif self.current_condition == WeatherCondition.CLOUDS:
+            pygame.draw.ellipse(screen, (255, 255, 255), (x-7, y-3, 14, 6))  # Nube
+        elif self.current_condition in [WeatherCondition.RAIN_LIGHT, WeatherCondition.RAIN]:
+            for i in range(3):  # Gotas de lluvia
+                pygame.draw.line(screen, (0, 0, 255), (x-5+i*5, y-5), (x-5+i*5, y+5), 2)
+        elif self.current_condition == WeatherCondition.STORM:
+            pygame.draw.polygon(screen, (255, 255, 0), [(x, y-8), (x-5, y+2), (x+5, y+2)])  # Rayo
+        elif self.current_condition == WeatherCondition.FOG:
+            for i in range(3):  # Líneas de niebla
+                pygame.draw.line(screen, (200, 200, 200), (x-7, y-5+i*5), (x+7, y-5+i*5), 2)
+        elif self.current_condition == WeatherCondition.WIND:
+            pygame.draw.arc(screen, (255, 255, 255), (x-8, y-8, 16, 16), 0, 3.14, 2)  # Arco de viento
+            pygame.draw.line(screen, (255, 255, 255), (x+5, y), (x+8, y-3), 2)
+        elif self.current_condition == WeatherCondition.HEAT:
+            pygame.draw.line(screen, (255, 0, 0), (x-5, y-5), (x+5, y+5), 2)  # Líneas de calor
+            pygame.draw.line(screen, (255, 0, 0), (x+5, y-5), (x-5, y+5), 2)
+        elif self.current_condition == WeatherCondition.COLD:
+            pygame.draw.polygon(screen, (200, 200, 255), [(x, y-8), (x-5, y-3), (x-3, y), 
+                                                         (x-5, y+5), (x, y+3), (x+5, y+5), 
+                                                         (x+3, y), (x+5, y-3)])
