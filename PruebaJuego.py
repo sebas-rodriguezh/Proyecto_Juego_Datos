@@ -5,7 +5,7 @@ from Player import Player
 from map import Map
 from api_manager import APIManager
 from weather import Weather
-from game_time import GameTime  # Importamos la nueva clase de tiempo
+from game_time import GameTime
 
 # Configuración inicial
 api = APIManager()
@@ -29,7 +29,7 @@ completed_jobs = []
 
 # Inicializar pygame y crear el mapa
 pygame.init()
-game_map = Map(map_data, tile_size=32)
+game_map = Map(map_data, tile_size=24)
 rows, cols = game_map.height, game_map.width
 screen_width = cols * game_map.tile_size + 300
 screen_height = rows * game_map.tile_size
@@ -85,48 +85,72 @@ def draw_sidebar():
     pygame.draw.rect(screen, (240, 240, 240), sidebar_rect)
     pygame.draw.line(screen, (200, 200, 200), (cols * game_map.tile_size, 0), (cols * game_map.tile_size, screen_height), 2)
     
-    # Título y ganancias
+    # Título y ganancias - REORGANIZADO PARA MEJOR VISIBILIDAD
     title = font_large.render("Courier Quest", True, (0, 0, 0))
     screen.blit(title, (cols * game_map.tile_size + 10, 10))
     
-    earnings_text = font_medium.render(f"Ganancias: ${total_earnings}", True, (0, 100, 0))
-    screen.blit(earnings_text, (cols * game_map.tile_size + 150, 12))
+    # TIEMPO EN POSICIÓN MÁS VISIBLE (ARRIBA DEL TODO)
+    time_bg = pygame.Rect(cols * game_map.tile_size + 10, 35, 280, 25)
+    pygame.draw.rect(screen, (220, 220, 220), time_bg, border_radius=5)
+    pygame.draw.rect(screen, (100, 100, 100), time_bg, 2, border_radius=5)
     
-    # Tiempo restante
-    time_text = font_medium.render(f"Tiempo: {game_time.get_remaining_time_formatted()}", True, (0, 0, 0))
-    screen.blit(time_text, (cols * game_map.tile_size + 10, 35))
+    # Cambiar color del tiempo según cuánto queda
+    remaining_time = game_time.get_remaining_time()
+    if remaining_time < 60:  # Menos de 1 minuto
+        time_color = (255, 50, 50)  # Rojo
+    elif remaining_time < 300:  # Menos de 5 minutos
+        time_color = (255, 150, 50)  # Naranja
+    else:
+        time_color = (0, 100, 0)  # Verde
     
-    # Meta de ingresos
-    goal_text = font_small.render(f"Meta: ${income_goal}", True, (0, 0, 0))
-    screen.blit(goal_text, (cols * game_map.tile_size + 150, 35))
+    time_text = font_medium.render(f"⏰ Tiempo: {game_time.get_remaining_time_formatted()}", True, time_color)
+    screen.blit(time_text, (cols * game_map.tile_size + 20, 38))
     
-    # Información del jugador
+    # Ganancias y meta
+    earnings_text = font_medium.render(f"💰 Ganancias: ${total_earnings}", True, (0, 100, 0))
+    screen.blit(earnings_text, (cols * game_map.tile_size + 10, 65))
+    
+    goal_text = font_small.render(f"🎯 Meta: ${income_goal}", True, (0, 0, 0))
+    screen.blit(goal_text, (cols * game_map.tile_size + 150, 65))
+    
+    # Información del jugador - MOVIDO MÁS ABAJO
     player_title = font_medium.render("Estado del Repartidor:", True, (0, 0, 0))
-    screen.blit(player_title, (cols * game_map.tile_size + 10, 60))
+    screen.blit(player_title, (cols * game_map.tile_size + 10, 90))
     
     # Barra de resistencia
     stamina_text = font_small.render(f"Resistencia: {int(player.stamina)}/100", True, (0, 0, 0))
-    screen.blit(stamina_text, (cols * game_map.tile_size + 10, 85))
-    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 100, 150, 15))
-    pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, 100, 150 * (player.stamina / 100), 15))
+    screen.blit(stamina_text, (cols * game_map.tile_size + 10, 115))
+    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 130, 150, 15))
+    pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, 130, 150 * (player.stamina / 100), 15))
     
     # Reputación
     reputation_text = font_small.render(f"Reputación: {player.reputation}/100", True, (0, 0, 0))
-    screen.blit(reputation_text, (cols * game_map.tile_size + 10, 120))
-    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 135, 150, 15))
-    pygame.draw.rect(screen, (0, 100, 200), (cols * game_map.tile_size + 10, 135, 150 * (player.reputation / 100), 15))
+    screen.blit(reputation_text, (cols * game_map.tile_size + 10, 150))
+    pygame.draw.rect(screen, (200, 200, 200), (cols * game_map.tile_size + 10, 165, 150, 15))
+    
+    # Color de la barra de reputación según el nivel
+    if player.reputation >= 90:
+        rep_color = (0, 200, 0)  # Verde para alta reputación
+    elif player.reputation >= 70:
+        rep_color = (0, 150, 200)  # Azul para reputación media
+    elif player.reputation >= 50:
+        rep_color = (255, 150, 0)  # Naranja para reputación baja
+    else:
+        rep_color = (255, 50, 50)  # Rojo para reputación muy baja
+        
+    pygame.draw.rect(screen, rep_color, (cols * game_map.tile_size + 10, 165, 150 * (player.reputation / 100), 15))
     
     # Peso actual
     weight_text = font_small.render(f"Peso: {player.current_weight}/{player.max_weight}", True, (0, 0, 0))
-    screen.blit(weight_text, (cols * game_map.tile_size + 10, 155))
+    screen.blit(weight_text, (cols * game_map.tile_size + 10, 185))
     
     # Inventario actual
     inventory_title = font_medium.render("Inventario:", True, (0, 0, 0))
-    screen.blit(inventory_title, (cols * game_map.tile_size + 10, 180))
+    screen.blit(inventory_title, (cols * game_map.tile_size + 10, 210))
     
     if player.inventory:
         for i, job in enumerate(player.inventory):
-            y_pos = 205 + i * 40
+            y_pos = 235 + i * 40
             pygame.draw.rect(screen, (200, 255, 200), (cols * game_map.tile_size + 10, y_pos, 280, 35))
             pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, y_pos, 280, 35), 2)
             
@@ -137,11 +161,11 @@ def draw_sidebar():
             screen.blit(destination, (cols * game_map.tile_size + 15, y_pos + 20))
     else:
         no_items = font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
-        screen.blit(no_items, (cols * game_map.tile_size + 15, 205))
+        screen.blit(no_items, (cols * game_map.tile_size + 15, 235))
     
     # Información del clima
     weather_title = font_medium.render("Condición Climática:", True, (0, 0, 0))
-    weather_y_pos = 270 if not player.inventory else 205 + len(player.inventory) * 40 + 10
+    weather_y_pos = 300 if not player.inventory else 235 + len(player.inventory) * 40 + 10
     screen.blit(weather_title, (cols * game_map.tile_size + 10, weather_y_pos))
     
     # Dibujar el indicador del clima usando la clase Weather
@@ -186,9 +210,10 @@ def draw_sidebar():
     
     # Leyenda del mapa
     legend_title = font_medium.render("Leyenda del Mapa:", True, (0, 0, 0))
-    screen.blit(legend_title, (cols * game_map.tile_size + 10, screen_height - 150))
+    legend_y_pos = screen_height - 150
+    screen.blit(legend_title, (cols * game_map.tile_size + 10, legend_y_pos))
     
-    y_pos = screen_height - 130
+    y_pos = legend_y_pos + 20
     for char, info in game_map.legend.items():
         color = game_map.COLORS.get(char, (100, 100, 255))
         pygame.draw.rect(screen, color, (cols * game_map.tile_size + 10, y_pos, 15, 15))
@@ -316,7 +341,7 @@ while running:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             
             if mouse_x > cols * game_map.tile_size:
-                weather_y_pos = 270 if not player.inventory else 205 + len(player.inventory) * 40 + 10
+                weather_y_pos = 300 if not player.inventory else 235 + len(player.inventory) * 40 + 10
                 jobs_y_pos = weather_y_pos + 85
                 job_index = (mouse_y - jobs_y_pos - 25) // 70
                 
