@@ -145,6 +145,13 @@ class Player:
         new_x = self.x + dx * speed * dt
         new_y = self.y + dy * speed * dt
         
+
+        # tile_x, tile_y = int(new_x), int(new_y)
+        # if 0 <= tile_y < len(tiles) and 0 <= tile_x < len(tiles[0]):
+        #    tile_char = tiles[tile_y][tile_x]
+        #    if self.legend.get(tile_char, {}).get("blocked", False):
+        #        return False  # No se puede mover a través de edificios
+        
         # Actualizar dirección
         if dx > 0:
             self.direction = "right"
