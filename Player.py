@@ -1,4 +1,6 @@
 # Player.py
+from OrderList import OrderList
+from Order import Order
 import pygame
 import os
 import sys
@@ -11,8 +13,13 @@ class Player:
         self.speed = 3
         self.stamina = 100
         self.reputation = 70
+<<<<<<< HEAD
         self.inventory = OrderList.OrderList()
         self.completed_orders = []
+=======
+        self.inventory = OrderList.create_empty()
+        self.completed_orders = OrderList.create_empty()
+>>>>>>> 543a30878772bd7babf3ad7338adcc4bc70e2ed0
         self.max_weight = 5
         self.current_weight = 0
         self.state = "normal"
@@ -221,8 +228,9 @@ class Player:
         else:
             self.state = "normal"
     
-    def add_to_inventory(self, job):
+    def add_to_inventory(self, order: Order) -> bool:
         """Añade un trabajo al inventario si hay capacidad"""
+<<<<<<< HEAD
         if self.current_weight + job["weight"] <= self.max_weight:
             self.inventory.enqueue(job)
             self.current_weight += job["weight"]
@@ -235,32 +243,48 @@ class Player:
         if job:
             self.current_weight -= job["weight"]
             self.completed_orders.append(job)
+=======
+        if self.current_weight + order.weight <= self.max_weight:
+            self.inventory.enqueue(order)
+            self.current_weight += order.weight
+            return True
+        return False
+    
+    def remove_from_inventory(self, order_id: str) -> bool:
+        """Elimina un trabajo del inventario y lo marca como completado"""
+        order = self.inventory.find_by_id(order_id)
+        if order:
+            self.current_weight -= order.weight
+            self.completed_orders.enqueue(order)
+            self.inventory.remove_by_id(order_id)
+            
+            # Aumentar reputación por entrega exitosa
+>>>>>>> 543a30878772bd7babf3ad7338adcc4bc70e2ed0
             self.reputation = min(100, self.reputation + 5)
             return True
         return False
     
-    def can_pickup_job(self, job):
+    def can_pickup_order(self, order: Order) -> bool:
         """Verifica si el jugador puede cargar un trabajo adicional"""
-        return self.current_weight + job["weight"] <= self.max_weight
+        return self.current_weight + order.weight <= self.max_weight
     
-    def is_at_location(self, location):
+    def is_at_location(self, location) -> bool:
         """Verifica si el jugador está en una ubicación específica"""
         return int(self.x) == location[0] and int(self.y) == location[1]
     
-    def get_nearby_jobs(self, jobs, max_distance=1):
+    def get_nearby_orders(self, orders, max_distance=1):
         """Obtiene trabajos cercanos al jugador"""
-        nearby_jobs = []
-        for job in jobs:
+        nearby_orders = []
+        for order in orders:
             # Calcular distancia Manhattan a los puntos de recogida y entrega
-            pickup_dist = abs(int(self.x) - job["pickup"][0]) + abs(int(self.y) - job["pickup"][1])
-            dropoff_dist = abs(int(self.x) - job["dropoff"][0]) + abs(int(self.y) - job["dropoff"][1])
+            pickup_dist = abs(int(self.x) - order.pickup[0]) + abs(int(self.y) - order.pickup[1])
+            dropoff_dist = abs(int(self.x) - order.dropoff[0]) + abs(int(self.y) - order.dropoff[1])
             
             # Añadir si está dentro de la distancia máxima
             if pickup_dist <= max_distance or dropoff_dist <= max_distance:
-                nearby_jobs.append(job)
+                nearby_orders.append(order)
                 
-        return nearby_jobs
-    
+        return nearby_orders
     def draw(self, screen, camera_x=0, camera_y=0):
         """Dibuja al jugador en la pantalla"""
         # Obtener sprite actual según dirección y frame de animación

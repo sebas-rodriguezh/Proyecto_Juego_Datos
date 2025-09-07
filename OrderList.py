@@ -173,6 +173,14 @@ class OrderList:
         return cls()
     
     # Métodos especiales
+    def append(self, order: Order) -> None:
+        """Alias para enqueue para compatibilidad con código existente"""
+        self.enqueue(order)
+
+    def __bool__(self) -> bool:
+        """Permite evaluar la OrderList como booleano (verificar si está vacía)"""
+        return not self.is_empty()
+    
     def __iter__(self) -> Iterator[Order]:
         """Iterador sobre las órdenes (desde el frente hasta atrás)"""
         return iter(self._orders)
