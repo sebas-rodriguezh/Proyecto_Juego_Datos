@@ -3,8 +3,6 @@ from OrderList import OrderList
 from Order import Order
 import pygame
 import os
-import sys
-import OrderList
 
 class Player:
     def __init__(self, x, y, tile_size, legend, scale_factor=1):
@@ -13,13 +11,8 @@ class Player:
         self.speed = 3
         self.stamina = 100
         self.reputation = 70
-<<<<<<< HEAD
-        self.inventory = OrderList.OrderList()
-        self.completed_orders = []
-=======
         self.inventory = OrderList.create_empty()
         self.completed_orders = OrderList.create_empty()
->>>>>>> 543a30878772bd7babf3ad7338adcc4bc70e2ed0
         self.max_weight = 5
         self.current_weight = 0
         self.state = "normal"
@@ -230,20 +223,6 @@ class Player:
     
     def add_to_inventory(self, order: Order) -> bool:
         """Añade un trabajo al inventario si hay capacidad"""
-<<<<<<< HEAD
-        if self.current_weight + job["weight"] <= self.max_weight:
-            self.inventory.enqueue(job)
-            self.current_weight += job["weight"]
-            return True
-        return False
-
-    def remove_from_inventory(self, job_id):
-        """Elimina un trabajo del inventario y lo marca como completado"""
-        job = self.inventory.remove_by_id(job_id)
-        if job:
-            self.current_weight -= job["weight"]
-            self.completed_orders.append(job)
-=======
         if self.current_weight + order.weight <= self.max_weight:
             self.inventory.enqueue(order)
             self.current_weight += order.weight
@@ -259,7 +238,6 @@ class Player:
             self.inventory.remove_by_id(order_id)
             
             # Aumentar reputación por entrega exitosa
->>>>>>> 543a30878772bd7babf3ad7338adcc4bc70e2ed0
             self.reputation = min(100, self.reputation + 5)
             return True
         return False
