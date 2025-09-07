@@ -1,4 +1,4 @@
-# Player.py - MODIFICADO
+# Player.py - MODIFICADO con sistema de recogida adyacente
 from OrderList import OrderList
 from Order import Order
 from Speed_Movement import Speed_Movement
@@ -45,8 +45,7 @@ class Player:
         self.animation_time = 0
         self.animation_speed = 0.1
         self.current_job = None
-        
-    # Métodos de sprites sin cambios (mantener load_sprites y create_fallback_sprites)
+    
     def load_sprites(self):
         try:
             sprite_sheet_image = pygame.image.load("traspa.png").convert_alpha()
@@ -108,55 +107,44 @@ class Player:
                 pygame.draw.circle(sprite, colors[direction], 
                                   (self.target_size//2, self.target_size//2), 
                                   self.target_size//3)
-                
         return sprites
     
     def try_move(self, dx, dy, tiles, weather_multiplier, surface_multiplier):
         """Intenta iniciar movimiento a una nueva casilla"""
         if self.is_moving:
-            return False  # Ya se está moviendo
+            return False
             
         if self.state == "exhausted":
-            return False  # No se puede mover si está exhausto
+            return False
         
-        # Calcular nueva posición objetivo
         new_x = self.grid_x + dx
         new_y = self.grid_y + dy
         
-        # Verificar límites del mapa
         if new_y < 0 or new_y >= len(tiles) or new_x < 0 or new_x >= len(tiles[0]):
             return False
             
-        # Verificar si la casilla está bloqueada
         tile_char = tiles[new_y][new_x]
         if self.legend.get(tile_char, {}).get("blocked", False):
             return False
         
-        # Actualizar sistema de velocidad con estado actual
         self.speed_system.actualizar_peso(self.current_weight)
         self.speed_system.actualizar_reputacion(self.reputation)
         self.speed_system.cambiar_estado_resistencia(self.state)
         
-        # Obtener tipo de superficie
         surface_type = self.legend.get(tile_char, {}).get("name", "asfalto")
-        
-        # Calcular duración del movimiento basado en la velocidad
         velocidad_final = self.speed_system.calcular_velocidad_final(surface_type)
-        velocidad_final *= weather_multiplier  # Aplicar multiplicador del clima
+        velocidad_final *= weather_multiplier
         
         if velocidad_final <= 0:
             return False
             
-        # Calcular tiempo para moverse 1 casilla
         self.move_duration = 1.0 / velocidad_final
         
-        # Iniciar movimiento
         self.target_x = new_x
         self.target_y = new_y
         self.is_moving = True
         self.move_timer = 0
         
-        # Actualizar dirección
         if dx > 0:
             self.direction = "right"
         elif dx < 0:
@@ -171,22 +159,18 @@ class Player:
     def update_movement(self, dt, weather_stamina_consumption=0):
         """Actualiza el movimiento suave entre casillas"""
         if not self.is_moving:
-            # Si no se está moviendo, recuperar stamina
             self.recover_stamina(dt)
             return
         
-        # Avanzar timer de movimiento
         self.move_timer += dt
         progress = min(1.0, self.move_timer / self.move_duration)
         
-        # Interpolar posición visual
         start_x, start_y = float(self.grid_x), float(self.grid_y)
         target_x, target_y = float(self.target_x), float(self.target_y)
         
         self.visual_x = start_x + (target_x - start_x) * progress
         self.visual_y = start_y + (target_y - start_y) * progress
         
-        # Si llegó al destino
         if progress >= 1.0:
             self.grid_x = self.target_x
             self.grid_y = self.target_y
@@ -194,19 +178,16 @@ class Player:
             self.visual_y = float(self.grid_y)
             self.is_moving = False
             
-            # Consumir stamina al completar el movimiento
             self.consume_stamina(self.move_duration, weather_stamina_consumption)
         
-        # Actualizar animación
         self.animation_time += dt
         if self.animation_time >= self.animation_speed:
             self.animation_time = 0
             self.current_frame = (self.current_frame + 1) % 4
     
     def consume_stamina(self, dt, weather_consumption=0):
-        """Consume stamina basado en movimiento, peso y condiciones climáticas"""
-        consumption = 0.5 * dt  # Consumo base por movimiento
-        consumption += weather_consumption * dt  # Consumo adicional por clima
+        consumption = 0.5 * dt
+        consumption += weather_consumption * dt
         
         if self.current_weight > 3:
             consumption += 0.2 * (self.current_weight - 3) * dt
@@ -222,7 +203,6 @@ class Player:
             self.state = "normal"
     
     def recover_stamina(self, dt, at_rest_point=False):
-        """Recupera stamina cuando el jugador está quieto"""
         recovery_rate = 5 if not at_rest_point else 10
         self.stamina += recovery_rate * dt
         
@@ -235,8 +215,61 @@ class Player:
             self.state = "normal"
     
     def is_at_location(self, location):
-        """Verifica si el jugador está en una ubicación específica"""
+        """Verifica si el jugador está EXACTAMENTE en una ubicación"""
         return self.grid_x == location[0] and self.grid_y == location[1]
+    
+    def is_adjacent_to_location(self, location):
+        """NUEVO: Verifica si el jugador está adyacente (incluye diagonal) a una ubicación"""
+        dx = abs(self.grid_x - location[0])
+        dy = abs(self.grid_y - location[1])
+        
+        # Adyacente incluye las 8 direcciones: arriba, abajo, izquierda, derecha y diagonales
+        return dx <= 1 and dy <= 1 and (dx != 0 or dy != 0)
+    
+    def is_near_location(self, location, include_exact=True):
+        """NUEVO: Verifica si está en la ubicación exacta O adyacente"""
+        if include_exact and self.is_at_location(location):
+            return True
+        return self.is_adjacent_to_location(location)
+    
+    def get_adjacent_positions(self):
+        """NUEVO: Retorna todas las posiciones adyacentes al jugador"""
+        adjacent = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:  # Saltar posición actual
+                    continue
+                adjacent.append((self.grid_x + dx, self.grid_y + dy))
+        return adjacent
+    
+    def get_interactable_orders(self, orders):
+        """NUEVO: Obtiene órdenes con las que puede interactuar (exacta + adyacente)"""
+        interactable = []
+        
+        for order in orders:
+            # Verificar recogida (si no está en inventario)
+            if self.inventory.find_by_id(order.id) is None:
+                if self.is_near_location(order.pickup):
+                    interactable.append({
+                        'order': order,
+                        'action': 'pickup',
+                        'location': order.pickup,
+                        'is_exact': self.is_at_location(order.pickup)
+                    })
+            
+            # Verificar entrega (si está en inventario)
+            elif self.inventory.find_by_id(order.id) is not None:
+                if self.is_near_location(order.dropoff):
+                    interactable.append({
+                        'order': order,
+                        'action': 'dropoff',
+                        'location': order.dropoff,
+                        'is_exact': self.is_at_location(order.dropoff)
+                    })
+        
+        # Priorizar interacciones exactas sobre adyacentes
+        interactable.sort(key=lambda x: not x['is_exact'])
+        return interactable
     
     def get_position(self):
         """Retorna la posición actual del jugador en el grid"""
@@ -246,7 +279,7 @@ class Player:
         """Retorna la posición visual para el rendering"""
         return (self.visual_x, self.visual_y)
     
-    # Métodos del inventario sin cambios
+    # Métodos del inventario (sin cambios)
     def add_to_inventory(self, order: Order) -> bool:
         if self.current_weight + order.weight <= self.max_weight:
             self.inventory.enqueue(order)
@@ -268,6 +301,7 @@ class Player:
         return self.current_weight + order.weight <= self.max_weight
     
     def get_nearby_orders(self, orders, max_distance=1):
+        """MEJORADO: Usa distancia Manhattan para órdenes cercanas"""
         nearby_orders = []
         for order in orders:
             pickup_dist = abs(self.grid_x - order.pickup[0]) + abs(self.grid_y - order.pickup[1])
@@ -282,7 +316,6 @@ class Player:
         """Dibuja al jugador usando la posición visual"""
         sprite = self.sprite_sheet[self.direction][self.current_frame]
         
-        # Usar posición visual en lugar de grid
         screen_x = (self.visual_x - camera_x) * self.tile_size
         screen_y = (self.visual_y - camera_y) * self.tile_size
         

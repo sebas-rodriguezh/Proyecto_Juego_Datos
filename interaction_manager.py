@@ -1,8 +1,8 @@
-# interaction_manager.py
+# interaction_manager.py - MODIFICADO con sistema adyacente
 import pygame
 
 class InteractionManager:
-    """Gestor de interacciones del jugador con el mundo del juego"""
+    """Gestor de interacciones del jugador con el mundo del juego - CON RECOGIDA ADYACENTE"""
     
     def __init__(self, player, active_orders, completed_orders):
         self.player = player
@@ -20,49 +20,44 @@ class InteractionManager:
             self.handle_interaction(game_state)
     
     def handle_interaction(self, game_state):
-        """Procesa interacciones de recogida y entrega"""
-        # Primero verificar entregas (tiene prioridad)
-        if self.try_delivery(game_state):
+        """Procesa interacciones de recogida y entrega - CON SISTEMA ADYACENTE"""
+        # Obtener todas las órdenes con las que puede interactuar
+        interactable_orders = self.player.get_interactable_orders(self.active_orders)
+        
+        if not interactable_orders:
+            self.show_message("No hay nada que hacer aquí", 2)
             return
         
-        # Luego verificar recogidas
-        self.try_pickup()
-    
-    def try_delivery(self, game_state):
-        """Intenta entregar pedidos en la ubicación actual"""
-        for order in list(self.player.inventory):
-            if self.player.is_at_location(order.dropoff):
-                if self.player.remove_from_inventory(order.id):
-                    # Añadir a trabajos completados y remover de activos
-                    self.completed_orders.enqueue(order)
-                    self.active_orders.remove_by_id(order.id)
-                    
-                    # Sumar ganancias con multiplicador de reputación
-                    earnings = self.calculate_earnings(order)
-                    game_state.add_earnings(earnings)
-                    
-                    self.show_message(f"Entregado: {order.id} +${earnings}")
-                    self.interaction_cooldown = 0.5
-                    return True
-        return False
-    
-    def try_pickup(self):
-        """Intenta recoger pedidos en la ubicación actual"""
-        for order in list(self.active_orders):
-            if self.player.is_at_location(order.pickup):
-                # Verificar si el pedido ya está en el inventario
-                if self.player.inventory.find_by_id(order.id) is not None:
-                    continue
+        # Procesar la primera interacción disponible (ya ordenada por prioridad)
+        interaction = interactable_orders[0]
+        order = interaction['order']
+        action = interaction['action']
+        is_exact = interaction['is_exact']
+        
+        if action == 'dropoff':
+            # Entregar pedido
+            if self.player.remove_from_inventory(order.id):
+                self.completed_orders.enqueue(order)
+                self.active_orders.remove_by_id(order.id)
                 
-                if self.player.can_pickup_order(order):
-                    if self.player.add_to_inventory(order):
-                        self.show_message(f"Recogido: {order.id}")
-                        self.interaction_cooldown = 0.5
-                        return True
+                earnings = self.calculate_earnings(order)
+                game_state.add_earnings(earnings)
+                
+                location_text = "exacta" if is_exact else "adyacente"
+                self.show_message(f"✓ Entregado {order.id} +${earnings} ({location_text})", 3)
+                self.interaction_cooldown = 0.5
+        
+        elif action == 'pickup':
+            # Recoger pedido
+            if self.player.can_pickup_order(order):
+                if self.player.add_to_inventory(order):
+                    location_text = "exacta" if is_exact else "adyacente"
+                    self.show_message(f"📦 Recogido {order.id} ({location_text})", 3)
+                    self.interaction_cooldown = 0.5
                 else:
-                    self.show_message("¡No tienes capacidad suficiente!")
-                    break
-        return False
+                    self.show_message("Error al recoger pedido", 2)
+            else:
+                self.show_message("¡No tienes capacidad suficiente!", 2)
     
     def calculate_earnings(self, order):
         """Calcula las ganancias de un pedido considerando la reputación"""
@@ -92,3 +87,24 @@ class InteractionManager:
     def get_message(self):
         """Retorna el mensaje actual si existe"""
         return self.interaction_message if self.message_timer > 0 else ""
+    
+    def get_interaction_hint(self):
+        """NUEVO: Obtiene pista de qué se puede hacer en la posición actual"""
+        interactable_orders = self.player.get_interactable_orders(self.active_orders)
+        
+        if not interactable_orders:
+            return ""
+        
+        interaction = interactable_orders[0]
+        action = interaction['action']
+        is_exact = interaction['is_exact']
+        order_id = interaction['order'].id
+        
+        if action == 'dropoff':
+            location_hint = "" if is_exact else " (adyacente)"
+            return f"Presiona E para entregar {order_id}{location_hint}"
+        elif action == 'pickup':
+            location_hint = "" if is_exact else " (adyacente)"
+            return f"Presiona E para recoger {order_id}{location_hint}"
+        
+        return ""

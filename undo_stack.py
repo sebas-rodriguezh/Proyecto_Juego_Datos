@@ -1,4 +1,4 @@
-# undo_stack.py
+# undo_stack.py - VERSIÓN OPTIMIZADA
 from collections import deque
 from datetime import datetime
 import copy
@@ -26,48 +26,29 @@ class UndoStack:
         self._operation_count = 0
     
     def push_state(self, snapshot):
-        """
-        Empuja un nuevo estado al stack (LIFO)
-        Complejidad: O(1)
-        """
+        """Empuja un nuevo estado al stack (LIFO) - Complejidad: O(1)"""
         self._undo_stack.append(snapshot)
         
         # Limpiar redo stack cuando se hace una nueva acción
         self._redo_stack.clear()
-        
         self._operation_count += 1
-        
-        print(f"Estado guardado: {snapshot} (Total: {len(self._undo_stack)})")
     
     def pop_for_undo(self):
-        """
-        Saca el último estado del stack para deshacer (LIFO)
-        Complejidad: O(1)
-        """
+        """Saca el último estado del stack para deshacer (LIFO) - Complejidad: O(1)"""
         if len(self._undo_stack) > 1:  # Mantener al menos 1 estado
             current_state = self._undo_stack.pop()
             self._redo_stack.append(current_state)  # Mover a redo stack
             
             # Retornar el estado anterior
-            previous_state = self._undo_stack[-1]
-            print(f"Undo: Regresando a {previous_state}")
-            return previous_state
-        
-        print("No hay más estados para deshacer")
+            return self._undo_stack[-1]
         return None
     
     def pop_for_redo(self):
-        """
-        Saca un estado del redo stack para rehacer
-        Complejidad: O(1)
-        """
+        """Saca un estado del redo stack para rehacer - Complejidad: O(1)"""
         if self._redo_stack:
             state_to_restore = self._redo_stack.pop()
             self._undo_stack.append(state_to_restore)
-            print(f"Redo: Restaurando {state_to_restore}")
             return state_to_restore
-        
-        print("No hay estados para rehacer")
         return None
     
     def can_undo(self):
@@ -91,45 +72,41 @@ class UndoStack:
     def size(self):
         """Retorna el tamaño del undo stack"""
         return len(self._undo_stack)
-    
-    def get_stack_info(self):
-        """Retorna información del stack para debugging"""
-        return {
-            "undo_size": len(self._undo_stack),
-            "redo_size": len(self._redo_stack),
-            "total_operations": self._operation_count,
-            "can_undo": self.can_undo(),
-            "can_redo": self.can_redo()
-        }
 
 class UndoRedoManager:
-    """Manager que integra el UndoStack con el juego"""
+    """Manager que integra el UndoStack con el juego - OPTIMIZADO"""
     
     def __init__(self, max_states=10):
         self.undo_stack = UndoStack(max_states)
         self.last_save_time = 0
-        self.save_interval = 1.0  # Guardar estado cada 1 segundo mínimo
+        self.save_interval = 2.0  # Guardar cada 2 segundos para reducir spam
+        self.last_position = None  # Optimización: solo guardar si cambió posición
     
-    def should_save_state(self, current_time):
+    def should_save_state(self, current_time, force_save=False):
         """Determina si debería guardar el estado actual"""
+        if force_save:
+            return True
         return (current_time - self.last_save_time) > self.save_interval
     
     def save_game_state(self, game_engine, force=False):
-        """
-        Captura y guarda el estado actual del juego
-        """
+        """Captura y guarda el estado actual del juego - OPTIMIZADO"""
         current_time = datetime.now().timestamp()
+        
+        # Optimización: solo guardar si el jugador cambió de posición
+        current_pos = (game_engine.player.grid_x, game_engine.player.grid_y)
+        if not force and self.last_position == current_pos:
+            return False
         
         if not force and not self.should_save_state(current_time):
             return False
         
         try:
             # Capturar posición del jugador
-            player_pos = (game_engine.player.grid_x, game_engine.player.grid_y)
+            player_pos = current_pos
             
             # Capturar stats del jugador
             player_stats = {
-                'stamina': game_engine.player.stamina,
+                'stamina': round(game_engine.player.stamina, 1),  # Redondear para reducir variaciones
                 'reputation': game_engine.player.reputation,
                 'current_weight': game_engine.player.current_weight,
                 'state': game_engine.player.state
@@ -152,41 +129,40 @@ class UndoRedoManager:
             # Guardar en stack
             self.undo_stack.push_state(snapshot)
             self.last_save_time = current_time
+            self.last_position = current_pos
             
             return True
             
         except Exception as e:
-            print(f"Error al guardar estado para undo: {e}")
+            # Silenciar errores para no spam
             return False
     
     def undo_last_action(self, game_engine):
-        """
-        Deshace la última acción
-        """
+        """Deshace la última acción"""
         snapshot = self.undo_stack.pop_for_undo()
         if snapshot:
             return self._restore_snapshot(game_engine, snapshot)
         return False
     
     def redo_last_action(self, game_engine):
-        """
-        Rehace la última acción deshecha
-        """
+        """Rehace la última acción deshecha"""
         snapshot = self.undo_stack.pop_for_redo()
         if snapshot:
             return self._restore_snapshot(game_engine, snapshot)
         return False
     
     def _restore_snapshot(self, game_engine, snapshot):
-        """
-        Restaura un snapshot al estado del juego
-        """
+        """Restaura un snapshot al estado del juego"""
         try:
             # Restaurar posición del jugador
             game_engine.player.grid_x, game_engine.player.grid_y = snapshot.player_pos
             game_engine.player.visual_x = float(game_engine.player.grid_x)
             game_engine.player.visual_y = float(game_engine.player.grid_y)
             game_engine.player.is_moving = False
+            
+            # Actualizar target para detener movimiento
+            game_engine.player.target_x = game_engine.player.grid_x
+            game_engine.player.target_y = game_engine.player.grid_y
             
             # Restaurar stats del jugador
             game_engine.player.stamina = snapshot.player_stats['stamina']
@@ -197,17 +173,19 @@ class UndoRedoManager:
             # Restaurar earnings
             game_engine.game_state.total_earnings = snapshot.earnings
             
-            # Restaurar inventario (simplificado - solo limpiar por ahora)
-            # En una implementación completa, reconstruirías las órdenes
-            if len(snapshot.inventory_ids) != len(game_engine.player.inventory):
-                print(f"Nota: Inventario cambió de {len(game_engine.player.inventory)} a {len(snapshot.inventory_ids)} items")
+            # Actualizar última posición conocida
+            self.last_position = snapshot.player_pos
             
             return True
             
         except Exception as e:
-            print(f"Error al restaurar snapshot: {e}")
             return False
     
     def get_undo_info(self):
         """Información para mostrar en UI"""
-        return self.undo_stack.get_stack_info()
+        return {
+            "undo_size": self.undo_stack.size(),
+            "redo_size": len(self.undo_stack._redo_stack),
+            "can_undo": self.undo_stack.can_undo(),
+            "can_redo": self.undo_stack.can_redo()
+        }
