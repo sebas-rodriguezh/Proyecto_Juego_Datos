@@ -1,6 +1,8 @@
 # Player.py
 import pygame
 import os
+import sys
+import OrderList
 
 class Player:
     def __init__(self, x, y, tile_size, legend, scale_factor=1):
@@ -9,7 +11,7 @@ class Player:
         self.speed = 3
         self.stamina = 100
         self.reputation = 70
-        self.inventory = []
+        self.inventory = OrderList.OrderList()
         self.completed_orders = []
         self.max_weight = 5
         self.current_weight = 0
@@ -222,22 +224,19 @@ class Player:
     def add_to_inventory(self, job):
         """Añade un trabajo al inventario si hay capacidad"""
         if self.current_weight + job["weight"] <= self.max_weight:
-            self.inventory.append(job)
+            self.inventory.enqueue(job)
             self.current_weight += job["weight"]
             return True
         return False
-    
+
     def remove_from_inventory(self, job_id):
         """Elimina un trabajo del inventario y lo marca como completado"""
-        for i, job in enumerate(self.inventory):
-            if job["id"] == job_id:
-                self.current_weight -= job["weight"]
-                self.completed_orders.append(job)
-                self.inventory.pop(i)
-                
-                # Aumentar reputación por entrega exitosa
-                self.reputation = min(100, self.reputation + 5)
-                return True
+        job = self.inventory.remove_by_id(job_id)
+        if job:
+            self.current_weight -= job["weight"]
+            self.completed_orders.append(job)
+            self.reputation = min(100, self.reputation + 5)
+            return True
         return False
     
     def can_pickup_job(self, job):
