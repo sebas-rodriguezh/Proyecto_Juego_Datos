@@ -29,7 +29,7 @@ completed_jobs = []
 
 # Inicializar pygame y crear el mapa
 pygame.init()
-game_map = Map(map_data, tile_size=24)
+game_map = Map(map_data, tile_size=30)
 rows, cols = game_map.height, game_map.width
 screen_width = cols * game_map.tile_size + 300
 screen_height = rows * game_map.tile_size
