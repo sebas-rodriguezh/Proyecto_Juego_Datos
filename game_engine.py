@@ -1,4 +1,4 @@
-# game_engine.py
+# game_engine.py - VERSIÓN COMPLETA ACTUALIZADA
 import pygame
 from datetime import datetime
 from Player import Player
@@ -11,6 +11,7 @@ from Order import Order
 from ui_manager import UIManager
 from interaction_manager import InteractionManager
 from game_state import GameState
+from undo_stack import UndoRedoManager
 
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
@@ -71,6 +72,10 @@ class GameEngine:
         # Configurar meta de ingresos
         self.income_goal = self.map_data.get("goal", 3000)
         self.game_state.set_income_goal(self.income_goal)
+        
+        # NUEVO: Sistema de undo/redo
+        self.undo_manager = UndoRedoManager(max_states=10)
+        self.undo_manager.save_game_state(self, force=True)
     
     def setup_managers(self):
         """Configura los managers del juego"""
@@ -86,15 +91,35 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
             
+            # NUEVO: Manejo de undo/redo
+            if event.type == pygame.KEYDOWN:
+                # Undo con Ctrl+Z
+                if event.key == pygame.K_z and pygame.key.get_pressed()[pygame.K_LCTRL]:
+                    if self.undo_manager.undo_last_action(self):
+                        self.ui_manager.show_message("Acción deshecha", 2)
+                    else:
+                        self.ui_manager.show_message("No se puede deshacer", 2)
+                
+                # Redo con Ctrl+Y
+                elif event.key == pygame.K_y and pygame.key.get_pressed()[pygame.K_LCTRL]:
+                    if self.undo_manager.redo_last_action(self):
+                        self.ui_manager.show_message("Acción rehecha", 2)
+                    else:
+                        self.ui_manager.show_message("No se puede rehacer", 2)
+                
+                # Reiniciar juego
+                elif event.key == pygame.K_r and self.game_state.game_over:
+                    self.restart_game()
+            
             # Delegar eventos a los managers apropiados
             self.ui_manager.handle_event(event, self.active_orders, self.player)
             
             if not self.game_state.game_over:
                 self.interaction_manager.handle_event(event, self.game_state)
             
-            # Reiniciar juego
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.game_state.game_over:
-                self.restart_game()
+            # NUEVO: Guardar estado después de interacciones importantes
+            if not self.game_state.game_over:
+                self.undo_manager.save_game_state(self)
     
     def update(self, dt):
         """Actualiza todos los sistemas del juego"""
@@ -111,47 +136,56 @@ class GameEngine:
             
             # Actualizar estado del juego
             self.update_game_state()
+            
+            # NUEVO: Guardar estado periódicamente durante movimiento
+            if self.player.is_moving:
+                self.undo_manager.save_game_state(self)
         
         # Actualizar cámara
         self.update_camera()
     
     def update_player_movement(self, dt):
-        """Actualiza el movimiento del jugador"""
-        keys = pygame.key.get_pressed()
-        dx, dy = 0, 0
+        """Actualiza el movimiento del jugador - VERSIÓN MODIFICADA"""
         
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            dx = -1
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            dx = 1
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            dy = -1
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            dy = 1
-        
-        # Obtener multiplicadores del clima
+        # Siempre actualizar el movimiento (para animaciones suaves)
         weather_multiplier = self.weather_system.get_speed_multiplier()
         weather_stamina_consumption = self.weather_system.get_stamina_consumption()
         
-        # Obtener multiplicador de superficie
-        tile_x, tile_y = int(self.player.x), int(self.player.y)
-        if 0 <= tile_y < len(self.game_map.tiles) and 0 <= tile_x < len(self.game_map.tiles[0]):
-            tile_char = self.game_map.tiles[tile_y][tile_x]
-            surface_multiplier = self.game_map.legend[tile_char].get("surface_weight", 1.0)
-        else:
-            surface_multiplier = 1.0
+        self.player.update_movement(dt, weather_stamina_consumption)
         
-        # Mover o recuperar stamina
-        if dx != 0 or dy != 0:
-            self.player.move(dx, dy, dt, weather_multiplier, surface_multiplier, 
-                           self.game_map.tiles, weather_stamina_consumption)
-        else:
-            self.player.recover_stamina(dt)
+        # Solo procesar input si no se está moviendo
+        if not self.player.is_moving:
+            keys = pygame.key.get_pressed()
+            dx, dy = 0, 0
+            
+            # Solo permitir movimiento en 4 direcciones (no diagonal)
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                dx = -1
+            elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                dx = 1
+            elif keys[pygame.K_UP] or keys[pygame.K_w]:
+                dy = -1
+            elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                dy = 1
+            
+            # Intentar movimiento
+            if dx != 0 or dy != 0:
+                # Obtener multiplicador de superficie
+                tile_x, tile_y = self.player.grid_x, self.player.grid_y
+                if 0 <= tile_y < len(self.game_map.tiles) and 0 <= tile_x < len(self.game_map.tiles[0]):
+                    tile_char = self.game_map.tiles[tile_y][tile_x]
+                    surface_multiplier = self.game_map.legend[tile_char].get("surface_weight", 1.0)
+                else:
+                    surface_multiplier = 1.0
+                
+                self.player.try_move(dx, dy, self.game_map.tiles, weather_multiplier, surface_multiplier)
     
     def update_camera(self):
-        """Actualiza la posición de la cámara"""
-        self.camera_x = self.player.x * self.game_map.tile_size - self.screen_width // 2 + 150
-        self.camera_y = self.player.y * self.game_map.tile_size - self.screen_height // 2
+        """Actualiza la posición de la cámara - USAR POSICIÓN VISUAL"""
+        visual_x, visual_y = self.player.get_visual_position()
+        
+        self.camera_x = visual_x * self.game_map.tile_size - self.screen_width // 2 + 150
+        self.camera_y = visual_y * self.game_map.tile_size - self.screen_height // 2
         self.camera_x = max(0, min(self.camera_x, self.cols * self.game_map.tile_size - self.screen_width + 300))
         self.camera_y = max(0, min(self.camera_y, self.rows * self.game_map.tile_size - self.screen_height))
     
@@ -224,6 +258,10 @@ class GameEngine:
         # Reiniciar managers
         self.interaction_manager = InteractionManager(self.player, self.active_orders, self.completed_orders)
         self.camera_x, self.camera_y = 0, 0
+        
+        # NUEVO: Reiniciar sistema de undo
+        self.undo_manager = UndoRedoManager(max_states=10)
+        self.undo_manager.save_game_state(self, force=True)
     
     def run(self):
         """Bucle principal del juego"""
