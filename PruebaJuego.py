@@ -6,6 +6,8 @@ from map import Map
 from api_manager import APIManager
 from weather import Weather
 from game_time import GameTime
+from OrderList import OrderList
+from Order import Order
 
 # Configuración inicial
 api = APIManager()
@@ -19,17 +21,13 @@ except Exception as e:
     print(f"Error al conectar con la API: {e}")
     exit()
 
-# Extraer información
-jobs = jobs_data["data"]  # Lista original de trabajos
-
-# Lista para trabajos activos (que pueden ser recogidos)
-active_jobs = jobs.copy()
-# Lista para trabajos completados
-completed_jobs = []
+# Crear OrderList desde la respuesta de la API
+active_orders = OrderList.from_api_response(jobs_data)
+completed_orders = OrderList.create_empty()
 
 # Inicializar pygame y crear el mapa
 pygame.init()
-game_map = Map(map_data, tile_size=30)
+game_map = Map(map_data, tile_size=24)
 rows, cols = game_map.height, game_map.width
 screen_width = cols * game_map.tile_size + 300
 screen_height = rows * game_map.tile_size
@@ -68,7 +66,7 @@ game_time.start()
 camera_x, camera_y = 0, 0
 
 # Variables para control de interacción
-selected_job = None
+selected_order = None
 interaction_cooldown = 0
 message = ""
 message_timer = 0
@@ -85,23 +83,23 @@ def draw_sidebar():
     pygame.draw.rect(screen, (240, 240, 240), sidebar_rect)
     pygame.draw.line(screen, (200, 200, 200), (cols * game_map.tile_size, 0), (cols * game_map.tile_size, screen_height), 2)
     
-    # Título y ganancias - REORGANIZADO PARA MEJOR VISIBILIDAD
+    # Título y ganancias
     title = font_large.render("Courier Quest", True, (0, 0, 0))
     screen.blit(title, (cols * game_map.tile_size + 10, 10))
     
-    # TIEMPO EN POSICIÓN MÁS VISIBLE (ARRIBA DEL TODO)
+    # Tiempo
     time_bg = pygame.Rect(cols * game_map.tile_size + 10, 35, 280, 25)
     pygame.draw.rect(screen, (220, 220, 220), time_bg, border_radius=5)
     pygame.draw.rect(screen, (100, 100, 100), time_bg, 2, border_radius=5)
     
     # Cambiar color del tiempo según cuánto queda
     remaining_time = game_time.get_remaining_time()
-    if remaining_time < 60:  # Menos de 1 minuto
-        time_color = (255, 50, 50)  # Rojo
-    elif remaining_time < 300:  # Menos de 5 minutos
-        time_color = (255, 150, 50)  # Naranja
+    if remaining_time < 60:
+        time_color = (255, 50, 50)
+    elif remaining_time < 300:
+        time_color = (255, 150, 50)
     else:
-        time_color = (0, 100, 0)  # Verde
+        time_color = (0, 100, 0)
     
     time_text = font_medium.render(f"⏰ Tiempo: {game_time.get_remaining_time_formatted()}", True, time_color)
     screen.blit(time_text, (cols * game_map.tile_size + 20, 38))
@@ -113,7 +111,7 @@ def draw_sidebar():
     goal_text = font_small.render(f"🎯 Meta: ${income_goal}", True, (0, 0, 0))
     screen.blit(goal_text, (cols * game_map.tile_size + 150, 65))
     
-    # Información del jugador - MOVIDO MÁS ABAJO
+    # Información del jugador
     player_title = font_medium.render("Estado del Repartidor:", True, (0, 0, 0))
     screen.blit(player_title, (cols * game_map.tile_size + 10, 90))
     
@@ -130,13 +128,13 @@ def draw_sidebar():
     
     # Color de la barra de reputación según el nivel
     if player.reputation >= 90:
-        rep_color = (0, 200, 0)  # Verde para alta reputación
+        rep_color = (0, 200, 0)
     elif player.reputation >= 70:
-        rep_color = (0, 150, 200)  # Azul para reputación media
+        rep_color = (0, 150, 200)
     elif player.reputation >= 50:
-        rep_color = (255, 150, 0)  # Naranja para reputación baja
+        rep_color = (255, 150, 0)
     else:
-        rep_color = (255, 50, 50)  # Rojo para reputación muy baja
+        rep_color = (255, 50, 50)
         
     pygame.draw.rect(screen, rep_color, (cols * game_map.tile_size + 10, 165, 150 * (player.reputation / 100), 15))
     
@@ -149,15 +147,15 @@ def draw_sidebar():
     screen.blit(inventory_title, (cols * game_map.tile_size + 10, 210))
     
     if player.inventory:
-        for i, job in enumerate(player.inventory):
+        for i, order in enumerate(player.inventory):
             y_pos = 235 + i * 40
             pygame.draw.rect(screen, (200, 255, 200), (cols * game_map.tile_size + 10, y_pos, 280, 35))
             pygame.draw.rect(screen, (0, 200, 0), (cols * game_map.tile_size + 10, y_pos, 280, 35), 2)
             
-            job_id = font_small.render(f"ID: {job['id']}", True, (0, 0, 0))
-            screen.blit(job_id, (cols * game_map.tile_size + 15, y_pos + 5))
+            order_id = font_small.render(f"ID: {order.id}", True, (0, 0, 0))
+            screen.blit(order_id, (cols * game_map.tile_size + 15, y_pos + 5))
             
-            destination = font_small.render(f"Entrega: {job['dropoff']}", True, (0, 0, 0))
+            destination = font_small.render(f"Entrega: {order.dropoff}", True, (0, 0, 0))
             screen.blit(destination, (cols * game_map.tile_size + 15, y_pos + 20))
     else:
         no_items = font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
@@ -187,25 +185,25 @@ def draw_sidebar():
     jobs_y_pos = weather_y_pos + 85
     screen.blit(jobs_title, (cols * game_map.tile_size + 10, jobs_y_pos))
     
-    for i, job in enumerate(active_jobs):
+    for i, order in enumerate(active_orders):
         y_pos = jobs_y_pos + 25 + i * 70
         
         pygame.draw.rect(screen, job_colors[i % len(job_colors)], 
                         (cols * game_map.tile_size + 10, y_pos, 20, 20))
         
-        job_id = font_small.render(f"ID: {job['id']}", True, (0, 0, 0))
-        screen.blit(job_id, (cols * game_map.tile_size + 35, y_pos))
+        order_id = font_small.render(f"ID: {order.id}", True, (0, 0, 0))
+        screen.blit(order_id, (cols * game_map.tile_size + 35, y_pos))
         
-        payout = font_small.render(f"Pago: ${job['payout']}", True, (0, 0, 0))
+        payout = font_small.render(f"Pago: ${order.payout}", True, (0, 0, 0))
         screen.blit(payout, (cols * game_map.tile_size + 35, y_pos + 15))
         
-        deadline = font_small.render(f"Entrega: {job['deadline'][11:16]}", True, (0, 0, 0))
+        deadline = font_small.render(f"Entrega: {order.deadline.strftime('%H:%M')}", True, (0, 0, 0))
         screen.blit(deadline, (cols * game_map.tile_size + 10, y_pos + 35))
         
-        weight = font_small.render(f"Peso: {job['weight']}", True, (0, 0, 0))
+        weight = font_small.render(f"Peso: {order.weight}", True, (0, 0, 0))
         screen.blit(weight, (cols * game_map.tile_size + 120, y_pos + 35))
         
-        priority = font_small.render(f"Prioridad: {job['priority']}", True, (0, 0, 0))
+        priority = font_small.render(f"Prioridad: {order.priority}", True, (0, 0, 0))
         screen.blit(priority, (cols * game_map.tile_size + 10, y_pos + 50))
     
     # Leyenda del mapa
@@ -222,17 +220,18 @@ def draw_sidebar():
         y_pos += 20
 
 # Función para dibujar marcadores de trabajos en el mapa
-def draw_job_markers():
+def draw_order_markers():
     # Dibujar solo trabajos activos (no completados)
-    for i, job in enumerate(active_jobs):
+    for i, order in enumerate(active_orders):
         color = job_colors[i % len(job_colors)]
         
         # Si el trabajo está en el inventario, usar color verde
-        if job in player.inventory:
+        # Usar find_by_id en lugar de "in" para objetos Order personalizados
+        if player.inventory.find_by_id(order.id) is not None:
             color = (0, 255, 0)  # Verde para trabajos en inventario
         
         # Dibujar punto de recogida
-        pickup_x, pickup_y = job["pickup"]
+        pickup_x, pickup_y = order.pickup
         pygame.draw.circle(screen, color, 
                           (pickup_x * game_map.tile_size + game_map.tile_size // 2 - camera_x, 
                            pickup_y * game_map.tile_size + game_map.tile_size // 2 - camera_y), 
@@ -243,7 +242,7 @@ def draw_job_markers():
                           7, 1)
         
         # Dibujar punto de entrega
-        dropoff_x, dropoff_y = job["dropoff"]
+        dropoff_x, dropoff_y = order.dropoff
         pygame.draw.rect(screen, color, 
                         (dropoff_x * game_map.tile_size + game_map.tile_size // 2 - 5 - camera_x, 
                          dropoff_y * game_map.tile_size + game_map.tile_size // 2 - 5 - camera_y, 
@@ -254,7 +253,7 @@ def draw_job_markers():
                          10, 10), 1)
         
         # Dibujar línea conectando recogida y entrega (solo si no está en inventario)
-        if job not in player.inventory:
+        if player.inventory.find_by_id(order.id) is None:
             pygame.draw.line(screen, color, 
                             (pickup_x * game_map.tile_size + game_map.tile_size // 2 - camera_x, 
                              pickup_y * game_map.tile_size + game_map.tile_size // 2 - camera_y),
@@ -286,15 +285,15 @@ def check_game_conditions():
 
 # Función para reiniciar el juego
 def restart_game():
-    global player, active_jobs, completed_jobs, total_earnings
+    global player, active_orders, completed_orders, total_earnings
     global game_over, victory, game_time, weather_system, camera_x, camera_y
     
     # Reiniciar jugador
     player = Player(cols // 2, rows // 2, game_map.tile_size, game_map.legend)
     
     # Reiniciar listas de trabajos
-    active_jobs = jobs.copy()
-    completed_jobs = []
+    active_orders = OrderList.from_api_response(jobs_data)
+    completed_orders = OrderList.create_empty()
     
     # Reiniciar variables de juego
     total_earnings = 0
@@ -343,39 +342,38 @@ while running:
             if mouse_x > cols * game_map.tile_size:
                 weather_y_pos = 300 if not player.inventory else 235 + len(player.inventory) * 40 + 10
                 jobs_y_pos = weather_y_pos + 85
-                job_index = (mouse_y - jobs_y_pos - 25) // 70
+                order_index = (mouse_y - jobs_y_pos - 25) // 70
                 
-                if 0 <= job_index < len(active_jobs):
-                    selected_job = active_jobs[job_index]
-                    message = f"Seleccionado: {selected_job['id']}"
+                if 0 <= order_index < len(active_orders):
+                    selected_order = active_orders[order_index]
+                    message = f"Seleccionado: {selected_order.id}"
                     message_timer = 3
         
         # Tecla E para interactuar (recoger/entregar)
         if event.type == pygame.KEYDOWN and event.key == pygame.K_e and interaction_cooldown <= 0 and not game_over:
             # Primero verificar entregas (tiene prioridad)
-            for job in player.inventory[:]:
-                if player.is_at_location(job["dropoff"]):
-                    if player.remove_from_inventory(job["id"]):
+            for order in list(player.inventory):  # Crear copia de la lista para evitar problemas durante la iteración
+                if player.is_at_location(order.dropoff):
+                    if player.remove_from_inventory(order.id):
                         # Añadir a trabajos completados y remover de activos
-                        completed_jobs.append(job)
-                        if job in active_jobs:
-                            active_jobs.remove(job)
+                        completed_orders.enqueue(order)
+                        active_orders.remove_by_id(order.id)
                         
                         # Sumar ganancias
-                        total_earnings += job["payout"]
+                        total_earnings += order.payout
                         
-                        message = f"Entregado: {job['id']} +${job['payout']}"
+                        message = f"Entregado: {order.id} +${order.payout}"
                         message_timer = 3
                         interaction_cooldown = 0.5
                         break
             
             # Luego verificar recogidas
             if interaction_cooldown <= 0:
-                for job in active_jobs[:]:
-                    if player.is_at_location(job["pickup"]):
-                        if player.can_pickup_job(job):
-                            if player.add_to_inventory(job):
-                                message = f"Recogido: {job['id']}"
+                for order in list(active_orders):  # Crear copia de la lista para evitar problemas durante la iteración
+                    if player.is_at_location(order.pickup):
+                        if player.can_pickup_order(order):
+                            if player.add_to_inventory(order):
+                                message = f"Recogido: {order.id}"
                                 message_timer = 3
                                 interaction_cooldown = 0.5
                                 break
@@ -413,7 +411,6 @@ while running:
             surface_multiplier = 1.0
         
         if dx != 0 or dy != 0:
-            # Pasar el consumo adicional de stamina al método move
             player.move(dx, dy, dt, weather_multiplier, surface_multiplier, game_map.tiles, weather_stamina_consumption)
         else:
             player.recover_stamina(dt)
@@ -437,7 +434,7 @@ while running:
             pygame.draw.rect(screen, (0, 0, 0), rect, 1)
     
     # Dibujar marcadores de trabajos
-    draw_job_markers()
+    draw_order_markers()
     
     # Dibujar jugador
     player.draw(screen, camera_x, camera_y)
@@ -472,9 +469,12 @@ while running:
     # Dibujar indicador de interacción (solo si el juego no ha terminado)
     if not game_over:
         nearby_active = False
-        for job in active_jobs:
-            if (player.is_at_location(job["pickup"]) and job not in player.inventory) or \
-               (job in player.inventory and player.is_at_location(job["dropoff"])):
+        for order in active_orders:
+            # Usar find_by_id en lugar de "in" para objetos Order personalizados
+            in_inventory = player.inventory.find_by_id(order.id) is not None
+            
+            if (player.is_at_location(order.pickup) and not in_inventory) or \
+               (in_inventory and player.is_at_location(order.dropoff)):
                 nearby_active = True
                 break
         
