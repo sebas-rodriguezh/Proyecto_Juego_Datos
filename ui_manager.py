@@ -1,4 +1,3 @@
-# ui_manager.py
 import pygame
 from datetime import datetime
 
@@ -24,6 +23,11 @@ class UIManager:
         self.message = ""
         self.message_timer = 0
         self.selected_order = None
+        
+        # NUEVO: Control de visibilidad de controles de inventario
+        self.show_inventory_controls = False
+        self.controls_timer = 0
+        self.controls_duration = 5.0  # Segundos que se muestran los controles
     
     def setup_fonts(self):
         """Configura las fuentes del juego"""
@@ -46,6 +50,12 @@ class UIManager:
             # Verificar clic en el panel lateral
             if mouse_x > self.game_map.width * self.game_map.tile_size:
                 self.handle_sidebar_click(mouse_x, mouse_y, active_orders, player)
+        
+        # NUEVO: Mostrar controles al presionar P o E
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_p or event.key == pygame.K_e:
+                self.show_inventory_controls = True
+                self.controls_timer = self.controls_duration
     
     def handle_sidebar_click(self, mouse_x, mouse_y, active_orders, player):
         """Maneja clics en el panel lateral"""
@@ -69,6 +79,12 @@ class UIManager:
             self.message_timer -= dt
         else:
             self.message = ""
+        
+        # NUEVO: Actualizar timer de controles
+        if self.show_inventory_controls:
+            self.controls_timer -= dt
+            if self.controls_timer <= 0:
+                self.show_inventory_controls = False
     
     def draw_sidebar(self, player, active_orders, weather_system, game_time, game_state):
         """Dibuja el panel lateral completo"""
@@ -79,6 +95,9 @@ class UIManager:
                         (cols * self.game_map.tile_size, 0), 
                         (cols * self.game_map.tile_size, self.screen_height), 2)
         
+        # Calcular x_offset (¡IMPORTANTE!)
+        x_offset = cols * self.game_map.tile_size
+        
         # Dibujar cada sección
         self.draw_header(cols, game_time, game_state)
         self.draw_player_status(cols, player)
@@ -86,6 +105,51 @@ class UIManager:
         self.draw_weather_info(cols, weather_system, player)
         self.draw_available_jobs(cols, active_orders, weather_system, player)
         self.draw_legend(cols)
+        
+        # NUEVO: Dibujar controles SOLO si están activos (en esquina inferior izquierda)
+        if self.show_inventory_controls:
+            self.draw_inventory_controls_popup()
+        else:
+            # Mostrar recordatorio pequeño en esquina inferior izquierda
+            self.draw_inventory_controls_hint()
+    
+    def draw_inventory_controls_popup(self):
+        """Dibuja un popup emergente con los controles de inventario en esquina inferior izquierda"""
+        # Posición en esquina inferior izquierda (fuera del sidebar)
+        popup_width = 280
+        popup_height = 70
+        popup_x = 10  # Esquina izquierda
+        popup_y = self.screen_height - popup_height - 10  # Esquina inferior
+        
+        # Fondo del popup con transparencia
+        popup_surface = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
+        popup_surface.fill((240, 240, 240, 230))  # Fondo semi-transparente
+        
+        # Borde
+        pygame.draw.rect(popup_surface, (0, 150, 0, 200), 
+                        (0, 0, popup_width, popup_height), 2)
+        
+        self.screen.blit(popup_surface, (popup_x, popup_y))
+        
+        # Título
+        title = self.font_medium.render("🎮 CONTROLES INVENTARIO", True, (0, 100, 0))
+        self.screen.blit(title, (popup_x + 10, popup_y + 5))
+        
+        # Controles (cambiado D por E)
+        controls = [
+            "P: Ordenar por Prioridad",
+            "O: Ordenar por Urgencia (Deadline)"
+        ]
+        
+        for i, control in enumerate(controls):
+            text = self.font_small.render(control, True, (0, 0, 0))
+            self.screen.blit(text, (popup_x + 20, popup_y + 25 + i * 15))
+    
+    def draw_inventory_controls_hint(self):
+        """Dibuja un pequeño recordatorio de los controles en esquina inferior izquierda"""
+        hint_text = self.font_small.render("Presiona P o E para controles de inventario", 
+                                         True, (100, 100, 100))
+        self.screen.blit(hint_text, (10, self.screen_height - 20))
     
     def draw_header(self, cols, game_time, game_state):
         """Dibuja el encabezado con título, tiempo y ganancias"""
@@ -164,7 +228,7 @@ class UIManager:
         pygame.draw.rect(self.screen, color, (x, y, width * progress, height))
     
     def draw_inventory(self, cols, player):
-        """Dibuja el inventario del jugador"""
+        """Dibuja el inventario mostrando prioridades"""
         x_offset = cols * self.game_map.tile_size
         
         inventory_title = self.font_medium.render("Inventario:", True, (0, 0, 0))
@@ -172,19 +236,34 @@ class UIManager:
         
         if player.inventory:
             for i, order in enumerate(player.inventory):
-                y_pos = 235 + i * 40
-                pygame.draw.rect(self.screen, (200, 255, 200), (x_offset + 10, y_pos, 280, 35))
-                pygame.draw.rect(self.screen, (0, 200, 0), (x_offset + 10, y_pos, 280, 35), 2)
+                y_pos = 235 + i * 45
                 
-                order_id = self.font_small.render(f"ID: {order.id}", True, (0, 0, 0))
-                self.screen.blit(order_id, (x_offset + 15, y_pos + 5))
+                # Color según prioridad
+                if order.priority > 0:
+                    bg_color = (255, 200, 200)  # Rojo claro para prioritarios
+                    border_color = (200, 0, 0)   # Rojo
+                    priority_icon = "🚨 "  # Icono de alerta
+                else:
+                    bg_color = (200, 255, 200)  # Verde claro para normales
+                    border_color = (0, 150, 0)   # Verde
+                    priority_icon = ""           # Sin icono
                 
-                destination = self.font_small.render(f"Entrega: {order.dropoff}", True, (0, 0, 0))
-                self.screen.blit(destination, (x_offset + 15, y_pos + 20))
+                pygame.draw.rect(self.screen, bg_color, (x_offset + 10, y_pos, 280, 40))
+                pygame.draw.rect(self.screen, border_color, (x_offset + 10, y_pos, 280, 40), 2)
+                
+                # Información del pedido
+                order_text = f"{priority_icon}{order.id}"
+                order_surface = self.font_small.render(order_text, True, (0, 0, 0))
+                self.screen.blit(order_surface, (x_offset + 15, y_pos + 5))
+                
+                # Información adicional
+                info_text = f"P:{order.priority} | ${order.payout} | {order.weight} kg | {order.deadline.strftime('%H:%M')}"
+                info_surface = self.font_small.render(info_text, True, (80, 80, 80))
+                self.screen.blit(info_surface, (x_offset + 15, y_pos + 20))
         else:
             no_items = self.font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
             self.screen.blit(no_items, (x_offset + 15, 235))
-    
+
     def draw_weather_info(self, cols, weather_system, player):
         """Dibuja información del clima"""
         x_offset = cols * self.game_map.tile_size

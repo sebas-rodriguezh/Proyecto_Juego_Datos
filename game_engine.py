@@ -106,6 +106,15 @@ class GameEngine:
                         self.ui_manager.show_message("Acción rehecha", 2)
                     else:
                         self.ui_manager.show_message("No se puede rehacer", 2)
+
+                if event.key == pygame.K_p:  # Tecla P para prioridad
+                    self.player.reorganize_inventory_by_priority()
+                    self.ui_manager.show_message("Inventario ordenado por PRIORIDAD", 2)
+                    
+                elif event.key == pygame.K_o:  # Tecla O para deadline
+                    self.player.reorganize_inventory_by_deadline()
+                    self.ui_manager.show_message("Inventario ordenado por URGENCIA", 2)                
+
                 
                 # Reiniciar juego
                 elif event.key == pygame.K_r and self.game_state.game_over:

@@ -185,23 +185,6 @@ class Player:
             self.animation_time = 0
             self.current_frame = (self.current_frame + 1) % 4
     
-    # def consume_stamina(self, dt, weather_consumption=0):
-    #     consumption = 6.9 * dt
-    #     consumption += weather_consumption * dt
-        
-    #     if self.current_weight > 3:
-    #         consumption += 0.2 * (self.current_weight - 3) * dt
-            
-    #     self.stamina -= consumption
-        
-    #     if self.stamina <= 0:
-    #         self.state = "exhausted"
-    #         self.stamina = 0
-    #     elif self.stamina <= 30:
-    #         self.state = "tired"
-    #     else:
-    #         self.state = "normal"
-
     def consume_stamina(self, dt, weather_consumption=0):
         print(f"=== CONSUMO STAMINA ===")
         print(f"DT: {dt:.4f}s - Weather consumption: {weather_consumption}")
@@ -256,7 +239,13 @@ class Player:
             if self.stamina > 30:
                 self.state = "normal"
 
+    def reorganize_inventory_by_priority(self):
+        if not self.inventory.is_empty():
+            self.inventory.reorganize_by_priority()
 
+    def reorganize_inventory_by_deadline(self):
+        if not self.inventory.is_empty():
+            self.inventory.reorganize_by_deadline()
     
     def is_at_location(self, location):
         """Verifica si el jugador está EXACTAMENTE en una ubicación"""
