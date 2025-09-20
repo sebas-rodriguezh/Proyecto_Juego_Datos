@@ -315,12 +315,12 @@ class UIManager:
         
         if nearby_active:
             hint_text = self.font_small.render("Presiona E para interactuar", True, (255, 255, 255))
-            hint_bg = pygame.Rect(player.x * self.game_map.tile_size - camera_x - 70, 
-                                 player.y * self.game_map.tile_size - camera_y - 25, 
+            hint_bg = pygame.Rect(player.visual_x * self.game_map.tile_size - camera_x - 70, 
+                                 player.visual_y * self.game_map.tile_size - camera_y - 25, 
                                  140, 20)
             pygame.draw.rect(self.screen, (0, 0, 0, 128), hint_bg, border_radius=5)
-            self.screen.blit(hint_text, (player.x * self.game_map.tile_size - camera_x - 65, 
-                                       player.y * self.game_map.tile_size - camera_y - 20))
+            self.screen.blit(hint_text, (player.visual_x * self.game_map.tile_size - camera_x - 65, 
+                                       player.visual_y * self.game_map.tile_size - camera_y - 20))
     
     def draw_game_over_screen(self, game_state):
         """Dibuja la pantalla de fin de juego"""
@@ -402,8 +402,8 @@ class UIManager:
                            (int(dropoff_x-1), int(dropoff_y-1), 2, 2))
         
         # Dibujar jugador
-        player_x = x + player.x * scale_x
-        player_y = y + player.y * scale_y
+        player_x = x + player.visual_x * scale_x
+        player_y = y + player.visual_y * scale_y
         pygame.draw.circle(self.screen, (255, 0, 0), (int(player_x), int(player_y)), 3)
     
     def draw_order_details_popup(self, order, mouse_pos):

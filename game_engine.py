@@ -70,7 +70,7 @@ class GameEngine:
         self.game_time.start()
         
         # Configurar meta de ingresos
-        self.income_goal = self.map_data.get("goal", 3000)
+        self.income_goal = self.map_data.get("goal", 1000)
         self.game_state.set_income_goal(self.income_goal)
         
         # NUEVO: Sistema de undo/redo

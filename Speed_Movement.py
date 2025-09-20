@@ -10,13 +10,8 @@ class Speed_Movement:
         
         # Definición de pesos de superficie
         self.pesos_superficie = {
-            "asfalto": 1.0,
-            "parque": 0.95,
-            "tierra": 0.85,
-            "arena": 0.7,
-            "agua": 0.4,
-            "nieve": 0.6,
-            "hielo": 0.5
+            "calle": 1.0,
+            "parque": 0.3
         }
         
         
@@ -26,8 +21,8 @@ class Speed_Movement:
         # Multiplicadores de resistencia
         self.multiplicadores_resistencia = {
             "normal": 1.0,
-            "cansado": 0.8,
-            "exhausto": 0.0
+            "tired": 0.8,
+            "exhausted": 0.0
         }
     
     def configurar_limite(self, multiplicador: float):
@@ -46,8 +41,11 @@ class Speed_Movement:
         """Cambia el estado de resistencia del jugador"""
         if estado in self.multiplicadores_resistencia:
             self.estado_resistencia = estado
+            print(f"Estado resistencia cambiado a: {estado}")  # DEBUG
         else:
-            print(f"Estado de resistencia no válido: {estado}")
+            print(f"ERROR: Estado de resistencia no válido: '{estado}'")  # DEBUG
+            print(f"Estados válidos: {list(self.multiplicadores_resistencia.keys())}")  # DEBUG
+
     
     def calcular_multiplicador_peso(self) -> float:
         """Calcula Mpeso = max(0.8, 1 - 0.03 * peso_total)"""

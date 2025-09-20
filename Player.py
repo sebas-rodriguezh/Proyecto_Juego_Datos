@@ -124,14 +124,14 @@ class Player:
             return False
             
         tile_char = tiles[new_y][new_x]
-        if self.legend.get(tile_char, {}).get("blocked", False):
-            return False
+        # if self.legend.get(tile_char, {}).get("blocked", False):
+        #     return False
         
         self.speed_system.actualizar_peso(self.current_weight)
         self.speed_system.actualizar_reputacion(self.reputation)
         self.speed_system.cambiar_estado_resistencia(self.state)
         
-        surface_type = self.legend.get(tile_char, {}).get("name", "asfalto")
+        surface_type = self.legend.get(tile_char, {}).get("name", "calle")
         velocidad_final = self.speed_system.calcular_velocidad_final(surface_type)
         velocidad_final *= weather_multiplier
         
@@ -185,23 +185,59 @@ class Player:
             self.animation_time = 0
             self.current_frame = (self.current_frame + 1) % 4
     
+    # def consume_stamina(self, dt, weather_consumption=0):
+    #     consumption = 6.9 * dt
+    #     consumption += weather_consumption * dt
+        
+    #     if self.current_weight > 3:
+    #         consumption += 0.2 * (self.current_weight - 3) * dt
+            
+    #     self.stamina -= consumption
+        
+    #     if self.stamina <= 0:
+    #         self.state = "exhausted"
+    #         self.stamina = 0
+    #     elif self.stamina <= 30:
+    #         self.state = "tired"
+    #     else:
+    #         self.state = "normal"
+
     def consume_stamina(self, dt, weather_consumption=0):
-        consumption = 0.5 * dt
+        print(f"=== CONSUMO STAMINA ===")
+        print(f"DT: {dt:.4f}s - Weather consumption: {weather_consumption}")
+        
+        consumption = 7 * dt
         consumption += weather_consumption * dt
         
         if self.current_weight > 3:
-            consumption += 0.2 * (self.current_weight - 3) * dt
-            
+            weight_extra = 0.2 * (self.current_weight - 3) * dt
+            consumption += weight_extra
+            print(f"Penalización peso: +{weight_extra:.3f}")
+        
+        print(f"Consumo total: {consumption:.3f}")
+        print(f"Stamina antes: {self.stamina:.1f}")
+        
         self.stamina -= consumption
+        print(f"Stamina después: {self.stamina:.1f}")
         
         if self.stamina <= 0:
             self.state = "exhausted"
             self.stamina = 0
+            print("¡¡¡EXHAUSTED!!! - Stamina agotada")
         elif self.stamina <= 30:
+            old_state = self.state
             self.state = "tired"
+            if old_state != "tired":
+                print("Estado cambiado a TIRED")
         else:
+            old_state = self.state
             self.state = "normal"
-    
+            if old_state != "normal":
+                print("Estado cambiado a NORMAL")
+        
+        print("======================")
+
+
     def recover_stamina(self, dt, at_rest_point=False):
         recovery_rate = 5 if not at_rest_point else 10
         self.stamina += recovery_rate * dt
@@ -209,10 +245,18 @@ class Player:
         if self.stamina > 100:
             self.stamina = 100
             
-        if self.stamina <= 30:
-            self.state = "tired"
+        # SOLO cambiar estado si NO está exhausted
+        if self.state != "exhausted":
+            if self.stamina <= 30:
+                self.state = "tired"
+            else:
+                self.state = "normal"
         else:
-            self.state = "normal"
+            # Si está exhausted, solo cambiar cuando stamina > 30
+            if self.stamina > 30:
+                self.state = "normal"
+
+
     
     def is_at_location(self, location):
         """Verifica si el jugador está EXACTAMENTE en una ubicación"""
