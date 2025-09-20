@@ -114,27 +114,3 @@ class Speed_Movement:
             "estado_resistencia": self.estado_resistencia,
             "superficie_actual": tipo_superficie
         }
-
-# Ejemplo de uso
-if __name__ == "__main__":
-    # Crear sistema de movimiento
-    sistema_mov = SistemaMovimiento(velocidad_base=3.0)
-    
-    # Configurar estado del jugador
-    sistema_mov.configurar_limite(1.0)  # Sin límite especial
-    sistema_mov.actualizar_reputacion(95.0)  # Buena reputación
-    sistema_mov.actualizar_peso(5.0)  # 5kg de carga
-    sistema_mov.cambiar_estado_resistencia("normal")
-    
-    # Calcular velocidad en diferentes superficies
-    velocidad_asfalto = sistema_mov.calcular_velocidad_final("asfalto")
-    velocidad_parque = sistema_mov.calcular_velocidad_final("parque")
-    velocidad_arena = sistema_mov.calcular_velocidad_final("arena")
-    
-    print(f"Velocidad en asfalto: {velocidad_asfalto:.2f} celdas/seg")
-    print(f"Velocidad en parque: {velocidad_parque:.2f} celdas/seg")
-    print(f"Velocidad en arena: {velocidad_arena:.2f} celdas/seg")
-    
-    # Obtener estado completo
-    estado = sistema_mov.obtener_estado_movimiento("asfalto")
-    print(f"\nEstado completo: {estado}")
