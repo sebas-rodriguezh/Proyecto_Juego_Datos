@@ -12,6 +12,7 @@ from ui_manager import UIManager
 from interaction_manager import InteractionManager
 from game_state import GameState
 from undo_stack import UndoRedoManager
+from setup_directories import setup_directories
 
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
@@ -36,18 +37,45 @@ class GameEngine:
         self.last_time = pygame.time.get_ticks()
         
     def setup_game_data(self):
-        """Carga datos iniciales de la API"""
+        """Carga datos iniciales de la API o caché local"""
         try:
             self.map_data = self.api.get_map_data()
             self.jobs_data = self.api.get_jobs()
             self.weather_data = self.api.get_weather()
+            print("✅ Datos cargados desde API")
         except Exception as e:
-            print(f"Error al conectar con la API: {e}")
+            print(f"❌ Error al conectar con la API: {e}")
+            print("🔄 Intentando cargar datos por defecto...")
+            self.load_default_data()
+
+    def load_default_data(self):
+        """Carga datos por defecto desde archivos locales"""
+        try:
+            import json
+            import os
+            
+            # Cargar mapa por defecto
+            with open('data/map_data.json', 'r', encoding='utf-8') as f:
+                self.map_data = json.load(f)
+            
+            # Cargar trabajos por defecto
+            with open('data/jobs_data.json', 'r', encoding='utf-8') as f:
+                self.jobs_data = json.load(f)
+            
+            # Cargar clima por defecto
+            with open('data/weather_data.json', 'r', encoding='utf-8') as f:
+                self.weather_data = json.load(f)
+                
+            print("✅ Datos por defecto cargados correctamente")
+            
+        except Exception as e:
+            print(f"❌ Error crítico: No se pudieron cargar los datos por defecto: {e}")
             raise
+        
     
     def setup_display(self):
         """Configura la pantalla y elementos visuales"""
-        self.game_map = Map(self.map_data, tile_size=24)
+        self.game_map = Map(self.map_data, tile_size=20)
         self.rows, self.cols = self.game_map.height, self.game_map.width
         self.screen_width = self.cols * self.game_map.tile_size + 300
         self.screen_height = self.rows * self.game_map.tile_size
@@ -288,6 +316,20 @@ class GameEngine:
         pygame.quit()
 
 # Punto de entrada
+# Al inicio del juego
 if __name__ == "__main__":
+    # Verificar y crear directorios necesarios
+    setup_directories()
+    
+    # Crear instancia del API manager
+    api = APIManager()
+    
+    # Verificar estado de conexión
+    if api.is_online():
+        print("🌐 Conectado a internet - Usando datos en tiempo real")
+    else:
+        print("📴 Modo offline - Usando datos cacheados o por defecto")
+    
+    # Iniciar juego
     game = GameEngine()
     game.run()
