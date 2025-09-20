@@ -186,7 +186,7 @@ class Player:
             self.current_frame = (self.current_frame + 1) % 4
     
     def consume_stamina(self, dt, weather_consumption=0):
-        consumption = 0.5 * dt
+        consumption = 10.5 * dt
         consumption += weather_consumption * dt
         
         if self.current_weight > 3:
@@ -197,7 +197,7 @@ class Player:
         if self.stamina <= 0:
             self.state = "exhausted"
             self.stamina = 0
-        elif self.stamina <= 30:
+        elif self.stamina <= 30:    
             self.state = "tired"
         else:
             self.state = "normal"

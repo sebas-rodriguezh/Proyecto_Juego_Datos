@@ -26,8 +26,8 @@ class Speed_Movement:
         # Multiplicadores de resistencia
         self.multiplicadores_resistencia = {
             "normal": 1.0,
-            "cansado": 0.8,
-            "exhausto": 0.0
+            "tired": 0.8,
+            "exhausted": 0.0
         }
     
     def configurar_limite(self, multiplicador: float):
