@@ -1,0 +1,16 @@
+{
+  "data": {
+    "initial": {"condition": "clear", "intensity": 0.2},
+    "transition": {
+      "clear": {"clear": 0.6, "clouds": 0.3, "rain_light": 0.1},
+      "clouds": {"clear": 0.3, "clouds": 0.5, "rain_light": 0.2},
+      "rain_light": {"clouds": 0.4, "rain_light": 0.4, "rain": 0.2},
+      "rain": {"rain_light": 0.4, "rain": 0.4, "storm": 0.2},
+      "storm": {"rain": 0.5, "clouds": 0.3, "storm": 0.2},
+      "fog": {"fog": 0.5, "clouds": 0.3, "clear": 0.2},
+      "wind": {"wind": 0.5, "clouds": 0.3, "clear": 0.2},
+      "heat": {"heat": 0.5, "clear": 0.3, "clouds": 0.2},
+      "cold": {"cold": 0.5, "clear": 0.3, "clouds": 0.2}
+    }
+  }
+}
