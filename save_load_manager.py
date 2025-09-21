@@ -1,46 +1,43 @@
-# save_load_manager.py
+# save_load_manager.py - VERSIÓN MEJORADA
 import json
 import os
 from datetime import datetime
 from typing import Optional, Dict, Any
+import pickle
+import base64
 
 class SaveLoadManager:
-    """Sistema de guardado y carga del juego"""
+    """Sistema de guardado y carga del juego - VERSIÓN MEJORADA"""
     
     SAVE_DIR = "saves"
-    CACHE_DIR = "api_cache"
-    DATA_DIR = "data"
     
     def __init__(self):
-        # Crear directorios si no existen
-        for directory in [self.SAVE_DIR, self.CACHE_DIR, self.DATA_DIR]:
-            os.makedirs(directory, exist_ok=True)
+        os.makedirs(self.SAVE_DIR, exist_ok=True)
     
     def save_game(self, game_engine, slot_name="slot1"):
-        """Guarda el estado completo del juego en formato JSON"""
+        """Guarda el estado completo del juego"""
         try:
-            # Serializar datos básicos primero
+            # Crear datos de guardado
             save_data = {
-                "version": "1.0",
+                "version": "2.0",
                 "timestamp": datetime.now().isoformat(),
                 "player_data": self._serialize_player(game_engine.player),
                 "active_orders": self._serialize_order_list(game_engine.active_orders),
                 "completed_orders": self._serialize_order_list(game_engine.completed_orders),
+                "pending_orders": self._serialize_order_list(game_engine.pending_orders),
                 "game_state": self._serialize_game_state(game_engine.game_state),
                 "game_time": self._serialize_game_time(game_engine.game_time),
                 "weather_state": self._serialize_weather(game_engine.weather_system),
                 "camera_position": (game_engine.camera_x, game_engine.camera_y),
-                "income_goal": game_engine.income_goal
+                "income_goal": game_engine.income_goal,
+                "map_info": {
+                    "width": game_engine.game_map.width,
+                    "height": game_engine.game_map.height,
+                    "city_name": game_engine.game_map.city_name
+                }
             }
             
-            # NO guardar map_data completo (es muy grande y causa problemas)
-            # En su lugar, guardar solo la referencia necesaria
-            save_data["map_reference"] = {
-                "width": game_engine.game_map.width,
-                "height": game_engine.game_map.height,
-                "city_name": getattr(game_engine.game_map, 'city_name', 'Unknown')
-            }
-            
+            # Guardar en archivo
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             with open(save_file, "w", encoding='utf-8') as f:
                 json.dump(save_data, f, indent=2, ensure_ascii=False)
@@ -51,11 +48,11 @@ class SaveLoadManager:
         except Exception as e:
             print(f"❌ Error al guardar: {e}")
             import traceback
-            traceback.print_exc()  # Esto mostrará el error completo
+            traceback.print_exc()
             return False
     
     def load_game(self, slot_name="slot1") -> Optional[Dict[str, Any]]:
-        """Carga el estado del juego desde archivo JSON"""
+        """Carga el estado del juego desde archivo"""
         try:
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             
@@ -75,85 +72,37 @@ class SaveLoadManager:
             traceback.print_exc()
             return None
     
-    def get_save_info(self, slot_name="slot1") -> Optional[Dict[str, str]]:
-        """Obtiene información básica de un archivo de guardado"""
-        try:
-            save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
-            
-            if not os.path.exists(save_file):
-                return None
-            
-            with open(save_file, "r", encoding='utf-8') as f:
-                save_data = json.load(f)
-            
-            return {
-                "timestamp": save_data.get("timestamp", "Desconocido"),
-                "version": save_data.get("version", "1.0"),
-                "earnings": save_data.get("game_state", {}).get("total_earnings", 0),
-                "orders_completed": save_data.get("game_state", {}).get("orders_completed", 0)
-            }
-            
-        except Exception as e:
-            print(f"Error al leer información del guardado: {e}")
-            return None
-    
-    def list_saves(self) -> Dict[str, Dict[str, str]]:
-        """Lista todos los archivos de guardado disponibles"""
+    def list_saves(self):
+        """Lista todas las partidas guardadas disponibles"""
         saves = {}
         
-        if not os.path.exists(self.SAVE_DIR):
-            return saves
+        for i in range(1, 4):  # 3 slots de guardado
+            slot_name = f"slot{i}"
+            save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             
-        for filename in os.listdir(self.SAVE_DIR):
-            if filename.endswith(".sav"):
-                slot_name = filename[:-4]  # Remover extensión .sav
-                info = self.get_save_info(slot_name)
-                if info:
-                    saves[slot_name] = info
+            if os.path.exists(save_file):
+                try:
+                    with open(save_file, "r", encoding='utf-8') as f:
+                        save_data = json.load(f)
+                    
+                    # Extraer información básica
+                    saves[slot_name] = {
+                        "earnings": save_data.get("game_state", {}).get("total_earnings", 0),
+                        "orders_completed": save_data.get("game_state", {}).get("orders_completed", 0),
+                        "timestamp": save_data.get("timestamp", "Desconocido")
+                    }
+                except Exception as e:
+                    print(f"Error leyendo información de {slot_name}: {e}")
+                    saves[slot_name] = {"error": "Archivo corrupto"}
         
         return saves
     
-    def delete_save(self, slot_name="slot1") -> bool:
-        """Elimina un archivo de guardado"""
-        try:
-            save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
-            if os.path.exists(save_file):
-                os.remove(save_file)
-                print(f"✅ Partida {slot_name} eliminada")
-                return True
-            return False
-        except Exception as e:
-            print(f"Error al eliminar guardado: {e}")
-            return False
-    
-    # Métodos de serialización privados - CORREGIDOS
-    def _serialize_player(self, player):
-        """Serializa el objeto jugador - VERSIÓN CORREGIDA"""
-        try:
-            return {
-                "grid_x": player.grid_x,
-                "grid_y": player.grid_y,
-                "visual_x": player.visual_x,
-                "visual_y": player.visual_y,
-                "stamina": player.stamina,
-                "reputation": player.reputation,
-                "current_weight": player.current_weight,
-                "max_weight": player.max_weight,
-                "state": player.state,
-                "direction": player.direction,
-                "inventory": self._serialize_order_list(player.inventory),
-                "completed_orders": self._serialize_order_list(player.completed_orders)
-            }
-        except Exception as e:
-            print(f"Error serializando jugador: {e}")
-            return {}
-    
     def _serialize_order_list(self, order_list):
-        """Serializa una OrderList - VERSIÓN CORREGIDA"""
+        """Serializa una OrderList - VERSIÓN MEJORADA"""
         orders_data = []
         try:
             for order in order_list:
-                orders_data.append({
+                order_data = {
                     "id": order.id,
                     "pickup": order.pickup,
                     "dropoff": order.dropoff,
@@ -161,14 +110,16 @@ class SaveLoadManager:
                     "deadline": order.deadline.isoformat() if hasattr(order.deadline, 'isoformat') else str(order.deadline),
                     "weight": order.weight,
                     "priority": order.priority,
-                    "release_time": order.release_time
-                })
+                    "release_time": order.release_time,
+                    "color": list(order.color) if hasattr(order, 'color') else [100, 100, 255]
+                }
+                orders_data.append(order_data)
         except Exception as e:
             print(f"Error serializando órdenes: {e}")
         return orders_data
     
     def _serialize_game_state(self, game_state):
-        """Serializa el estado del juego - VERSIÓN CORREGIDA"""
+        """Serializa el estado del juego"""
         try:
             return {
                 "total_earnings": game_state.total_earnings,
@@ -189,17 +140,18 @@ class SaveLoadManager:
             return {}
     
     def _serialize_game_time(self, game_time):
-        """Serializa el tiempo de juego - VERSIÓN CORREGIDA"""
+        """Serializa el tiempo de juego"""
         try:
             return {
-                "elapsed_time_sec": game_time.get_elapsed_time() if hasattr(game_time, 'get_elapsed_time') else 0
+                "elapsed_time_sec": game_time.get_elapsed_time() if hasattr(game_time, 'get_elapsed_time') else 0,
+                "total_duration": game_time.total_duration if hasattr(game_time, 'total_duration') else 900
             }
         except Exception as e:
             print(f"Error serializando tiempo de juego: {e}")
             return {}
     
     def _serialize_weather(self, weather_system):
-        """Serializa el sistema de clima - VERSIÓN CORREGIDA"""
+        """Serializa el sistema de clima"""
         try:
             return {
                 "current_condition": weather_system.current_condition.value if hasattr(weather_system.current_condition, 'value') else str(weather_system.current_condition),
@@ -208,4 +160,24 @@ class SaveLoadManager:
             }
         except Exception as e:
             print(f"Error serializando clima: {e}")
+            return {}
+    
+    def _serialize_player(self, player):
+        """Serializa el estado del jugador"""
+        try:
+            return {
+                "grid_x": player.grid_x,
+                "grid_y": player.grid_y,
+                "visual_x": player.visual_x,
+                "visual_y": player.visual_y,
+                "stamina": player.stamina,
+                "reputation": player.reputation,
+                "current_weight": player.current_weight,
+                "state": player.state,
+                "direction": player.direction,
+                "inventory": self._serialize_order_list(player.inventory),
+                "completed_orders": self._serialize_order_list(player.completed_orders)
+            }
+        except Exception as e:
+            print(f"Error serializando jugador: {e}")
             return {}

@@ -16,6 +16,7 @@ from setup_directories import setup_directories
 import json
 import os
 from save_load_manager import SaveLoadManager
+from datetime import timedelta
 
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
@@ -25,6 +26,7 @@ class GameEngine:
         pygame.init()
         from setup_directories import setup_directories
         setup_directories()  # Esto creará la carpeta 'saves'
+        
         # Configuración inicial
         self.api = APIManager()
         self.setup_game_data()
@@ -36,19 +38,19 @@ class GameEngine:
         # NUEVO: Sistema de guardado/carga
         self.save_manager = SaveLoadManager()
         
-        # Si se especificó un slot para cargar, intentar cargarlo
+        # PRIMERO cargar o crear partida (para que el player exista)
         if load_slot:
             self.load_game(load_slot)
         else:
             self.setup_game_objects()
         
+        # LUEGO configurar managers (después de que el player exista)
         self.setup_managers()
         
         # Variables de control del bucle principal
         self.running = True
         self.clock = pygame.time.Clock()
         self.last_time = pygame.time.get_ticks()
-    
     def setup_game_data(self):
         """Carga datos iniciales de la API o caché local"""
         try:
@@ -134,44 +136,105 @@ class GameEngine:
         # Sistema de undo/redo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
-    
+        
+# Añadir este método en game_engine.py
+    def _create_order_from_save_data(self, order_data):
+        """Crea una orden desde datos de guardado"""
+        from datetime import datetime
+        
+        # Manejar diferentes formatos de deadline
+        deadline = order_data["deadline"]
+        if isinstance(deadline, str):
+            deadline = datetime.fromisoformat(deadline)
+        
+        # Crear orden
+        order = Order(
+            id=order_data["id"],
+            pickup=order_data["pickup"],
+            dropoff=order_data["dropoff"],
+            payout=order_data["payout"],
+            deadline=deadline,
+            weight=order_data["weight"],
+            priority=order_data["priority"],
+            release_time=order_data["release_time"]
+        )
+        
+        # Restaurar color si existe
+        if "color" in order_data:
+            order.color = tuple(order_data["color"])
+        
+        return order
     def load_from_save_data(self, save_data):
-        """Carga el estado del juego desde datos guardados"""
+        """Carga el estado del juego desde datos guardados - VERSIÓN MEJORADA"""
         try:
+            print(f"🔄 Cargando partida desde datos guardados...")
+            
+            # ✅ INICIALIZAR TODAS LAS LISTAS DE ÓRDENES
+            self.active_orders = OrderList.create_empty()
+            self.completed_orders = OrderList.create_empty()
+            self.pending_orders = OrderList.create_empty()
+            
             # Cargar estado del jugador
             player_data = save_data["player_data"]
             self.player = Player(
-                player_data["x"], 
-                player_data["y"], 
+                player_data["grid_x"],
+                player_data["grid_y"], 
                 self.game_map.tile_size, 
                 self.game_map.legend
             )
+            
+            # Restaurar propiedades del jugador
             self.player.stamina = player_data["stamina"]
             self.player.reputation = player_data["reputation"]
             self.player.current_weight = player_data["current_weight"]
             self.player.state = player_data["state"]
             self.player.direction = player_data["direction"]
+            self.player.visual_x = player_data.get("visual_x", player_data["grid_x"])
+            self.player.visual_y = player_data.get("visual_y", player_data["grid_y"])
+            
+            # Limpiar inventarios existentes
+            self.player.inventory.clear()
+            self.player.completed_orders.clear()
             
             # Cargar inventario
             for order_data in player_data["inventory"]:
-                order = Order.from_dict(order_data)
-                self.player.add_to_inventory(order)
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.player.add_to_inventory(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden al inventario: {e}")
             
-            # Cargar órdenes completadas
+            # Cargar órdenes completadas del jugador
             for order_data in player_data["completed_orders"]:
-                order = Order.from_dict(order_data)
-                self.player.completed_orders.enqueue(order)
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.player.completed_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden completada: {e}")
             
             # Cargar listas de órdenes
-            self.active_orders = OrderList.create_empty()
             for order_data in save_data["active_orders"]:
-                order = Order.from_dict(order_data)
-                self.active_orders.enqueue(order)
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.active_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden activa: {e}")
             
-            self.completed_orders = OrderList.create_empty()
             for order_data in save_data["completed_orders"]:
-                order = Order.from_dict(order_data)
-                self.completed_orders.enqueue(order)
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.completed_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden completada global: {e}")
+            
+            # ✅ CARGAR ÓRDENES PENDIENTES
+            if "pending_orders" in save_data:
+                for order_data in save_data["pending_orders"]:
+                    try:
+                        order = self._create_order_from_save_data(order_data)
+                        self.pending_orders.enqueue(order)
+                    except Exception as e:
+                        print(f"⚠️ Error cargando orden pendiente: {e}")
             
             # Cargar estado del juego
             game_state_data = save_data["game_state"]
@@ -186,22 +249,47 @@ class GameEngine:
             self.game_state.late_deliveries = game_state_data["late_deliveries"]
             self.game_state.current_streak = game_state_data["current_streak"]
             self.game_state.best_streak = game_state_data["best_streak"]
-            self.game_state.start_time = datetime.fromisoformat(game_state_data["start_time"])
             
-            # Cargar tiempo de juego
+            # Convertir string de start_time a datetime
+            start_time_str = game_state_data["start_time"]
+            if isinstance(start_time_str, str):
+                self.game_state.start_time = datetime.fromisoformat(start_time_str)
+            
+            # Cargar tiempo de juego - CORRECCIÓN IMPORTANTE
             game_time_data = save_data["game_time"]
-            self.game_time = GameTime(total_duration_min=15)
-            self.game_time.elapsed_time_sec = game_time_data["elapsed_time_sec"]
+            elapsed_time = game_time_data.get("elapsed_time_sec", 0)
+            total_duration = game_time_data.get("total_duration", 900)
+            
+            # Reiniciar game_time con la duración correcta
+            self.game_time = GameTime(total_duration_min=total_duration/60)
+            self.game_time.start()
+            
+            # Ajustar tiempo transcurrido manualmente
+            current_time_seconds = pygame.time.get_ticks() / 1000.0
+            adjusted_start_time = current_time_seconds - elapsed_time
+            self.game_time.start_time = adjusted_start_time
             
             # Cargar clima
             weather_data = save_data["weather_state"]
             self.weather_system = Weather(self.api)
-            # Aquí deberías implementar la carga del estado del clima
             
-            # Cargar cámara
+            # Configurar clima actual
+            try:
+                from weather import WeatherCondition
+                condition_str = weather_data["current_condition"]
+                # Buscar la condición climática correspondiente
+                for condition in WeatherCondition:
+                    if condition.value == condition_str:
+                        self.weather_system.current_condition = condition
+                        break
+                
+                self.weather_system.current_intensity = weather_data.get("current_intensity", 0.0)
+                self.weather_system.current_multiplier = weather_data.get("current_multiplier", 1.0)
+            except Exception as e:
+                print(f"⚠️ Error configurando clima: {e}")
+            
+            # Cargar cámara y meta
             self.camera_x, self.camera_y = save_data["camera_position"]
-            
-            # Cargar meta de ingresos
             self.income_goal = save_data["income_goal"]
             
             # Reiniciar sistema de undo
@@ -212,9 +300,37 @@ class GameEngine:
             
         except Exception as e:
             print(f"❌ Error al cargar partida: {e}")
+            import traceback
+            traceback.print_exc()
             print("🔄 Iniciando nueva partida...")
             self.setup_new_game()
-    
+
+    def _create_order_from_save_data(self, order_data):
+        """Crea una orden desde datos de guardado"""
+        from datetime import datetime
+        
+        # Manejar diferentes formatos de deadline
+        deadline = order_data["deadline"]
+        if isinstance(deadline, str):
+            deadline = datetime.fromisoformat(deadline)
+        
+        # Crear orden
+        order = Order(
+            id=order_data["id"],
+            pickup=order_data["pickup"],
+            dropoff=order_data["dropoff"],
+            payout=order_data["payout"],
+            deadline=deadline,
+            weight=order_data["weight"],
+            priority=order_data["priority"],
+            release_time=order_data["release_time"]
+        )
+        
+        # Restaurar color si existe
+        if "color" in order_data:
+            order.color = tuple(order_data["color"])
+        
+        return order
     def save_game(self, slot_name="slot1"):
         """Guarda el estado actual del juego"""
         success = self.save_manager.save_game(self, slot_name)
@@ -224,7 +340,6 @@ class GameEngine:
         else:
             print("❌ Error al guardar partida")
             return False
-    
     def load_game(self, slot_name="slot1"):
         """Carga una partida guardada"""
         save_data = self.save_manager.load_game(slot_name)
@@ -478,6 +593,8 @@ class GameEngine:
         # Reiniciar sistema de undo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
+    
+    
     
     def run(self):
         """Bucle principal del juego"""

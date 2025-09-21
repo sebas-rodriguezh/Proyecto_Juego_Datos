@@ -1,56 +1,20 @@
 {
-  "version": "1.0",
-  "timestamp": "2025-09-20T19:50:15.006020",
+  "version": "2.0",
+  "timestamp": "2025-09-20T21:01:20.509782",
   "player_data": {
-    "grid_x": 20,
+    "grid_x": 15,
     "grid_y": 15,
-    "visual_x": 20.0,
+    "visual_x": 15.0,
     "visual_y": 15.0,
-    "stamina": 24.343731404650423,
-    "reputation": 75,
+    "stamina": 100,
+    "reputation": 70,
     "current_weight": 0,
-    "max_weight": 5,
-    "state": "tired",
-    "direction": "left",
+    "state": "normal",
+    "direction": "right",
     "inventory": [],
-    "completed_orders": [
-      {
-        "id": "REQ-001",
-        "pickup": [
-          20,
-          19
-        ],
-        "dropoff": [
-          10,
-          22
-        ],
-        "payout": 180.0,
-        "deadline": "2025-09-01T12:10:00",
-        "weight": 1,
-        "priority": 0,
-        "release_time": 0
-      }
-    ]
+    "completed_orders": []
   },
   "active_orders": [
-    {
-      "id": "REQ-002",
-      "pickup": [
-        27,
-        24
-      ],
-      "dropoff": [
-        4,
-        6
-      ],
-      "payout": 260.0,
-      "deadline": "2025-09-01T12:09:00",
-      "weight": 2,
-      "priority": 1,
-      "release_time": 45
-    }
-  ],
-  "completed_orders": [
     {
       "id": "REQ-001",
       "pickup": [
@@ -65,11 +29,103 @@
       "deadline": "2025-09-01T12:10:00",
       "weight": 1,
       "priority": 0,
-      "release_time": 0
+      "release_time": 0,
+      "color": [
+        255,
+        100,
+        100
+      ]
+    }
+  ],
+  "completed_orders": [],
+  "pending_orders": [
+    {
+      "id": "REQ-002",
+      "pickup": [
+        27,
+        24
+      ],
+      "dropoff": [
+        4,
+        6
+      ],
+      "payout": 260.0,
+      "deadline": "2025-09-01T12:09:00",
+      "weight": 2,
+      "priority": 1,
+      "release_time": 45,
+      "color": [
+        100,
+        100,
+        255
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "pickup": [
+        23,
+        9
+      ],
+      "dropoff": [
+        26,
+        5
+      ],
+      "payout": 140.0,
+      "deadline": "2025-09-01T12:08:00",
+      "weight": 1,
+      "priority": 0,
+      "release_time": 90,
+      "color": [
+        255,
+        255,
+        100
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "pickup": [
+        20,
+        22
+      ],
+      "dropoff": [
+        7,
+        18
+      ],
+      "payout": 220.0,
+      "deadline": "2025-09-01T12:12:00",
+      "weight": 3,
+      "priority": 0,
+      "release_time": 150,
+      "color": [
+        255,
+        100,
+        255
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "pickup": [
+        20,
+        21
+      ],
+      "dropoff": [
+        10,
+        20
+      ],
+      "payout": 300.0,
+      "deadline": "2025-09-01T12:11:00",
+      "weight": 2,
+      "priority": 1,
+      "release_time": 210,
+      "color": [
+        100,
+        255,
+        255
+      ]
     }
   ],
   "game_state": {
-    "total_earnings": 180,
+    "total_earnings": 0,
     "income_goal": 1000,
     "game_over": false,
     "victory": false,
@@ -80,22 +136,23 @@
     "late_deliveries": 0,
     "current_streak": 0,
     "best_streak": 0,
-    "start_time": "2025-09-20T19:49:29.206285"
+    "start_time": "2025-09-20T21:00:46.091419"
   },
   "game_time": {
-    "elapsed_time_sec": 45.214
+    "elapsed_time_sec": 33.84,
+    "total_duration": 900
   },
   "weather_state": {
-    "current_condition": "storm",
-    "current_intensity": 0.4984721448750521,
-    "current_multiplier": 0.7773666666666667
+    "current_condition": "clouds",
+    "current_intensity": 0.3084213860766225,
+    "current_multiplier": 0.8700200000000001
   },
   "camera_position": [
     0,
     0
   ],
   "income_goal": 1000,
-  "map_reference": {
+  "map_info": {
     "width": 30,
     "height": 30,
     "city_name": "TigerCity"
