@@ -86,7 +86,7 @@ class UIManager:
             if self.controls_timer <= 0:
                 self.show_inventory_controls = False
     
-    def draw_sidebar(self, player, active_orders, weather_system, game_time, game_state):
+    def draw_sidebar(self, player, active_orders, weather_system, game_time, game_state, pending_count=0):
         """Dibuja el panel lateral completo"""
         cols = self.game_map.width
         sidebar_rect = pygame.Rect(cols * self.game_map.tile_size, 0, 300, self.screen_height)
@@ -103,7 +103,7 @@ class UIManager:
         self.draw_player_status(cols, player)
         self.draw_inventory(cols, player)
         self.draw_weather_info(cols, weather_system, player)
-        self.draw_available_jobs(cols, active_orders, weather_system, player)
+        self.draw_available_jobs(cols, active_orders, weather_system, player, pending_count)
         #self.draw_legend(cols)
         
         # NUEVO: Dibujar controles SOLO si están activos (en esquina inferior izquierda)
@@ -297,8 +297,8 @@ class UIManager:
                                           True, (0, 0, 0))
         self.screen.blit(speed_text, (x_offset + 60, weather_y_pos + 55))
     
-    def draw_available_jobs(self, cols, active_orders, weather_system, player):
-        """Dibuja la lista de trabajos disponibles"""
+    def draw_available_jobs(self, cols, active_orders, weather_system, player, pending_count=0):
+        """Dibuja la lista de trabajos disponibles (SOLO los activos)"""
         x_offset = cols * self.game_map.tile_size
         
         weather_y_pos = 300 if not player.inventory else 235 + len(player.inventory) * 40 + 10
@@ -306,11 +306,12 @@ class UIManager:
         jobs_y_pos = weather_y_pos + 85
         self.screen.blit(jobs_title, (x_offset + 10, jobs_y_pos))
         
+        # Mostrar solo pedidos activos (no pendientes)
         for i, order in enumerate(active_orders):
             y_pos = jobs_y_pos + 25 + i * 70
             
             pygame.draw.rect(self.screen, self.job_colors[i % len(self.job_colors)], 
-                           (x_offset + 10, y_pos, 20, 20))
+                        (x_offset + 10, y_pos, 20, 20))
             
             order_id = self.font_small.render(f"ID: {order.id}", True, (0, 0, 0))
             self.screen.blit(order_id, (x_offset + 35, y_pos))
@@ -327,7 +328,14 @@ class UIManager:
             
             priority = self.font_small.render(f"Prioridad: {order.priority}", True, (0, 0, 0))
             self.screen.blit(priority, (x_offset + 10, y_pos + 50))
-    
+        
+        # Mostrar contador de pedidos pendientes
+        if pending_count > 0:
+            pending_text = self.font_small.render(f"⏰ {pending_count} pedidos pendientes...", 
+                                            True, (100, 100, 100))
+            self.screen.blit(pending_text, (x_offset + 10, jobs_y_pos + 25 + len(active_orders) * 70))
+
+
     def draw_legend(self, cols):
         """Dibuja la leyenda del mapa"""
         x_offset = cols * self.game_map.tile_size

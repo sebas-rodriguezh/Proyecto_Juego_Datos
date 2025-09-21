@@ -84,13 +84,22 @@ class GameEngine:
     
     def setup_game_objects(self):
         """Crea los objetos principales del juego"""
-        # Crear listas de pedidos
-        self.active_orders = OrderList.from_api_response(self.jobs_data)
+        # Crear listas de pedidos con sistema de release time
+        self.all_orders = OrderList.from_api_response(self.jobs_data)  # Todos los pedidos
+        self.active_orders = OrderList.create_empty()  # Pedidos activos (liberados)
+        self.pending_orders = OrderList.create_empty()  # Pedidos pendientes de liberar
         self.completed_orders = OrderList.create_empty()
+        
+        # Separar pedidos por release_time
+        for order in self.all_orders:
+            if order.release_time == 0:
+                self.active_orders.enqueue(order)  # Liberar inmediatamente
+            else:
+                self.pending_orders.enqueue(order)  # Pendientes por tiempo
         
         # Crear jugador
         self.player = Player(self.cols // 2, self.rows // 2, 
-                           self.game_map.tile_size, self.game_map.legend)
+                        self.game_map.tile_size, self.game_map.legend)
         
         # Crear sistemas
         self.weather_system = Weather(self.api)
@@ -104,6 +113,32 @@ class GameEngine:
         # NUEVO: Sistema de undo/redo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
+
+    def update_release_times(self, dt):
+        """Libera pedidos según su release_time"""
+        current_time = self.game_time.get_elapsed_time()
+        
+        # Crear lista temporal de pedidos pendientes
+        orders_to_release = []
+        remaining_orders = OrderList.create_empty()
+        
+        # Revisar todos los pedidos pendientes
+        while not self.pending_orders.is_empty():
+            order = self.pending_orders.dequeue()
+            
+            if current_time >= order.release_time:
+                orders_to_release.append(order)
+                # Mostrar mensaje de nuevo pedido
+                self.ui_manager.show_message(f"📦 Nuevo pedido: {order.id}", 3)
+            else:
+                remaining_orders.enqueue(order)
+        
+        # Devolver pedidos que aún no se liberan
+        self.pending_orders = remaining_orders
+        
+        # Liberar pedidos que cumplieron su tiempo
+        for order in orders_to_release:
+            self.active_orders.enqueue(order)       
     
     def setup_managers(self):
         """Configura los managers del juego"""
@@ -164,6 +199,9 @@ class GameEngine:
             # Actualizar sistemas principales
             self.game_time.update(dt)
             self.weather_system.update(dt)
+            #NUEVO. 
+            self.update_release_times(dt)
+
             
             # Actualizar movimiento del jugador
             self.update_player_movement(dt)
@@ -249,9 +287,10 @@ class GameEngine:
         # Dibujar jugador
         self.player.draw(self.screen, self.camera_x, self.camera_y)
         
-        # Dibujar UI
+        # Dibujar UI - Pasar el conteo de pedidos pendientes
+        pending_count = len(self.pending_orders)
         self.ui_manager.draw_sidebar(self.player, self.active_orders, self.weather_system, 
-                                   self.game_time, self.game_state)
+                                self.game_time, self.game_state, pending_count)
         
         # Dibujar mensajes y overlays
         self.ui_manager.draw_messages()
@@ -277,11 +316,20 @@ class GameEngine:
         """Reinicia el juego"""
         # Reiniciar jugador
         self.player = Player(self.cols // 2, self.rows // 2, 
-                           self.game_map.tile_size, self.game_map.legend)
+                        self.game_map.tile_size, self.game_map.legend)
         
-        # Reiniciar listas de trabajos
-        self.active_orders = OrderList.from_api_response(self.jobs_data)
+        # Reiniciar listas de trabajos con release time
+        self.all_orders = OrderList.from_api_response(self.jobs_data)
+        self.active_orders = OrderList.create_empty()
+        self.pending_orders = OrderList.create_empty()
         self.completed_orders = OrderList.create_empty()
+        
+        # Separar pedidos por release_time
+        for order in self.all_orders:
+            if order.release_time == 0:
+                self.active_orders.enqueue(order)
+            else:
+                self.pending_orders.enqueue(order)
         
         # Reiniciar estado del juego
         self.game_state = GameState()
@@ -296,7 +344,7 @@ class GameEngine:
         self.interaction_manager = InteractionManager(self.player, self.active_orders, self.completed_orders)
         self.camera_x, self.camera_y = 0, 0
         
-        # NUEVO: Reiniciar sistema de undo
+        # Reiniciar sistema de undo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
     
