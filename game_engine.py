@@ -1,4 +1,4 @@
-# game_engine.py - VERSIÓN COMPLETA ACTUALIZADA
+# game_engine.py - VERSIÓN COMPLETA ACTUALIZADA CON SISTEMA DE GUARDADO/CARGA
 import pygame
 from datetime import datetime
 from Player import Player
@@ -13,14 +13,18 @@ from interaction_manager import InteractionManager
 from game_state import GameState
 from undo_stack import UndoRedoManager
 from setup_directories import setup_directories
+import json
+import os
+from save_load_manager import SaveLoadManager
 
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
     
-    def __init__(self):
+    def __init__(self, load_slot=None):
         # Inicializar pygame
         pygame.init()
-        
+        from setup_directories import setup_directories
+        setup_directories()  # Esto creará la carpeta 'saves'
         # Configuración inicial
         self.api = APIManager()
         self.setup_game_data()
@@ -28,14 +32,23 @@ class GameEngine:
         # Crear sistemas principales
         self.game_state = GameState()
         self.setup_display()
-        self.setup_game_objects()
+        
+        # NUEVO: Sistema de guardado/carga
+        self.save_manager = SaveLoadManager()
+        
+        # Si se especificó un slot para cargar, intentar cargarlo
+        if load_slot:
+            self.load_game(load_slot)
+        else:
+            self.setup_game_objects()
+        
         self.setup_managers()
         
         # Variables de control del bucle principal
         self.running = True
         self.clock = pygame.time.Clock()
         self.last_time = pygame.time.get_ticks()
-        
+    
     def setup_game_data(self):
         """Carga datos iniciales de la API o caché local"""
         try:
@@ -71,7 +84,6 @@ class GameEngine:
         except Exception as e:
             print(f"❌ Error crítico: No se pudieron cargar los datos por defecto: {e}")
             raise
-        
     
     def setup_display(self):
         """Configura la pantalla y elementos visuales"""
@@ -82,8 +94,17 @@ class GameEngine:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Courier Quest")
     
-    def setup_game_objects(self):
+    def setup_game_objects(self, loaded_data=None):
         """Crea los objetos principales del juego"""
+        if loaded_data:
+            # Cargar desde datos guardados
+            self.load_from_save_data(loaded_data)
+        else:
+            # Configuración inicial nueva partida
+            self.setup_new_game()
+    
+    def setup_new_game(self):
+        """Configura una nueva partida desde cero"""
         # Crear listas de pedidos con sistema de release time
         self.all_orders = OrderList.from_api_response(self.jobs_data)  # Todos los pedidos
         self.active_orders = OrderList.create_empty()  # Pedidos activos (liberados)
@@ -110,10 +131,112 @@ class GameEngine:
         self.income_goal = self.map_data.get("goal", 1000)
         self.game_state.set_income_goal(self.income_goal)
         
-        # NUEVO: Sistema de undo/redo
+        # Sistema de undo/redo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
-
+    
+    def load_from_save_data(self, save_data):
+        """Carga el estado del juego desde datos guardados"""
+        try:
+            # Cargar estado del jugador
+            player_data = save_data["player_data"]
+            self.player = Player(
+                player_data["x"], 
+                player_data["y"], 
+                self.game_map.tile_size, 
+                self.game_map.legend
+            )
+            self.player.stamina = player_data["stamina"]
+            self.player.reputation = player_data["reputation"]
+            self.player.current_weight = player_data["current_weight"]
+            self.player.state = player_data["state"]
+            self.player.direction = player_data["direction"]
+            
+            # Cargar inventario
+            for order_data in player_data["inventory"]:
+                order = Order.from_dict(order_data)
+                self.player.add_to_inventory(order)
+            
+            # Cargar órdenes completadas
+            for order_data in player_data["completed_orders"]:
+                order = Order.from_dict(order_data)
+                self.player.completed_orders.enqueue(order)
+            
+            # Cargar listas de órdenes
+            self.active_orders = OrderList.create_empty()
+            for order_data in save_data["active_orders"]:
+                order = Order.from_dict(order_data)
+                self.active_orders.enqueue(order)
+            
+            self.completed_orders = OrderList.create_empty()
+            for order_data in save_data["completed_orders"]:
+                order = Order.from_dict(order_data)
+                self.completed_orders.enqueue(order)
+            
+            # Cargar estado del juego
+            game_state_data = save_data["game_state"]
+            self.game_state.total_earnings = game_state_data["total_earnings"]
+            self.game_state.income_goal = game_state_data["income_goal"]
+            self.game_state.game_over = game_state_data["game_over"]
+            self.game_state.victory = game_state_data["victory"]
+            self.game_state.game_over_reason = game_state_data["game_over_reason"]
+            self.game_state.orders_completed = game_state_data["orders_completed"]
+            self.game_state.orders_cancelled = game_state_data["orders_cancelled"]
+            self.game_state.perfect_deliveries = game_state_data["perfect_deliveries"]
+            self.game_state.late_deliveries = game_state_data["late_deliveries"]
+            self.game_state.current_streak = game_state_data["current_streak"]
+            self.game_state.best_streak = game_state_data["best_streak"]
+            self.game_state.start_time = datetime.fromisoformat(game_state_data["start_time"])
+            
+            # Cargar tiempo de juego
+            game_time_data = save_data["game_time"]
+            self.game_time = GameTime(total_duration_min=15)
+            self.game_time.elapsed_time_sec = game_time_data["elapsed_time_sec"]
+            
+            # Cargar clima
+            weather_data = save_data["weather_state"]
+            self.weather_system = Weather(self.api)
+            # Aquí deberías implementar la carga del estado del clima
+            
+            # Cargar cámara
+            self.camera_x, self.camera_y = save_data["camera_position"]
+            
+            # Cargar meta de ingresos
+            self.income_goal = save_data["income_goal"]
+            
+            # Reiniciar sistema de undo
+            self.undo_manager = UndoRedoManager(max_states=10)
+            self.undo_manager.save_game_state(self, force=True)
+            
+            print("✅ Partida cargada correctamente")
+            
+        except Exception as e:
+            print(f"❌ Error al cargar partida: {e}")
+            print("🔄 Iniciando nueva partida...")
+            self.setup_new_game()
+    
+    def save_game(self, slot_name="slot1"):
+        """Guarda el estado actual del juego"""
+        success = self.save_manager.save_game(self, slot_name)
+        if success:
+            print(f"✅ Partida guardada en slot: {slot_name}")
+            return True
+        else:
+            print("❌ Error al guardar partida")
+            return False
+    
+    def load_game(self, slot_name="slot1"):
+        """Carga una partida guardada"""
+        save_data = self.save_manager.load_game(slot_name)
+        if save_data:
+            self.setup_game_objects(save_data)
+            return True
+        else:
+            print(f"❌ No se encontró partida en slot: {slot_name}")
+            print("🔄 Iniciando nueva partida...")
+            self.setup_game_objects()
+            return False
+    
     def update_release_times(self, dt):
         """Libera pedidos según su release_time"""
         current_time = self.game_time.get_elapsed_time()
@@ -154,7 +277,7 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
             
-            # NUEVO: Manejo de undo/redo
+            # Manejo de undo/redo
             if event.type == pygame.KEYDOWN:
                 # Undo con Ctrl+Z
                 if event.key == pygame.K_z and pygame.key.get_pressed()[pygame.K_LCTRL]:
@@ -169,7 +292,21 @@ class GameEngine:
                         self.ui_manager.show_message("Acción rehecha", 2)
                     else:
                         self.ui_manager.show_message("No se puede rehacer", 2)
-
+                
+                # Guardar partida con Ctrl+S
+                elif event.key == pygame.K_s and pygame.key.get_pressed()[pygame.K_LCTRL]:
+                    if self.save_game("slot1"):
+                        self.ui_manager.show_message("Partida guardada", 2)
+                    else:
+                        self.ui_manager.show_message("Error al guardar", 2)
+                
+                # Cargar partida con Ctrl+L
+                elif event.key == pygame.K_l and pygame.key.get_pressed()[pygame.K_LCTRL]:
+                    if self.load_game("slot1"):
+                        self.ui_manager.show_message("Partida cargada", 2)
+                    else:
+                        self.ui_manager.show_message("Error al cargar", 2)
+                
                 if event.key == pygame.K_p:  # Tecla P para prioridad
                     self.player.reorganize_inventory_by_priority()
                     self.ui_manager.show_message("Inventario ordenado por PRIORIDAD", 2)
@@ -177,11 +314,6 @@ class GameEngine:
                 elif event.key == pygame.K_o:  # Tecla O para deadline
                     self.player.reorganize_inventory_by_deadline()
                     self.ui_manager.show_message("Inventario ordenado por URGENCIA", 2)                
-
-                
-                # Reiniciar juego
-                elif event.key == pygame.K_r and self.game_state.game_over:
-                    self.restart_game()
             
             # Delegar eventos a los managers apropiados
             self.ui_manager.handle_event(event, self.active_orders, self.player)
@@ -189,7 +321,7 @@ class GameEngine:
             if not self.game_state.game_over:
                 self.interaction_manager.handle_event(event, self.game_state)
             
-            # NUEVO: Guardar estado después de interacciones importantes
+            # Guardar estado después de interacciones importantes
             if not self.game_state.game_over:
                 self.undo_manager.save_game_state(self)
     
@@ -199,7 +331,6 @@ class GameEngine:
             # Actualizar sistemas principales
             self.game_time.update(dt)
             self.weather_system.update(dt)
-            #NUEVO. 
             self.update_release_times(dt)
 
             
@@ -212,7 +343,7 @@ class GameEngine:
             # Actualizar estado del juego
             self.update_game_state()
             
-            # NUEVO: Guardar estado periódicamente durante movimiento
+            # Guardar estado periódicamente durante movimiento
             if self.player.is_moving:
                 self.undo_manager.save_game_state(self)
         
@@ -364,7 +495,6 @@ class GameEngine:
         pygame.quit()
 
 # Punto de entrada
-# Al inicio del juego
 if __name__ == "__main__":
     # Verificar y crear directorios necesarios
     setup_directories()

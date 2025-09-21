@@ -1,4 +1,4 @@
-# main.py - VERSIÓN SIMPLE Y EFECTIVA
+# main.py - VERSIÓN ACTUALIZADA CON CARGA DE PARTIDAS
 import pygame
 import sys
 from main_menu import MainMenu
@@ -17,6 +17,8 @@ def main():
             
             # 2. Mostrar menú
             menu_running = True
+            load_slot = None
+            
             while menu_running:
                 action = menu.handle_events()
                 
@@ -25,14 +27,17 @@ def main():
                     sys.exit()
                 elif action == "new_game":
                     menu_running = False
+                elif action and action.startswith("load_"):
+                    load_slot = action[5:]  # Extraer el nombre del slot
+                    menu_running = False
                 
                 menu.draw()
                 pygame.display.flip()
                 clock.tick(60)
             
-            # 3. Ejecutar juego (SIN MODIFICAR GameEngine)
+            # 3. Ejecutar juego (con opción de cargar partida)
             from game_engine import GameEngine
-            game = GameEngine()
+            game = GameEngine(load_slot=load_slot)
             game.run()
             
         except pygame.error as e:

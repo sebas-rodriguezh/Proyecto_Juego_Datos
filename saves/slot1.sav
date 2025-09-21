@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "timestamp": "2025-09-20T19:50:15.006020",
+  "player_data": {
+    "grid_x": 20,
+    "grid_y": 15,
+    "visual_x": 20.0,
+    "visual_y": 15.0,
+    "stamina": 24.343731404650423,
+    "reputation": 75,
+    "current_weight": 0,
+    "max_weight": 5,
+    "state": "tired",
+    "direction": "left",
+    "inventory": [],
+    "completed_orders": [
+      {
+        "id": "REQ-001",
+        "pickup": [
+          20,
+          19
+        ],
+        "dropoff": [
+          10,
+          22
+        ],
+        "payout": 180.0,
+        "deadline": "2025-09-01T12:10:00",
+        "weight": 1,
+        "priority": 0,
+        "release_time": 0
+      }
+    ]
+  },
+  "active_orders": [
+    {
+      "id": "REQ-002",
+      "pickup": [
+        27,
+        24
+      ],
+      "dropoff": [
+        4,
+        6
+      ],
+      "payout": 260.0,
+      "deadline": "2025-09-01T12:09:00",
+      "weight": 2,
+      "priority": 1,
+      "release_time": 45
+    }
+  ],
+  "completed_orders": [
+    {
+      "id": "REQ-001",
+      "pickup": [
+        20,
+        19
+      ],
+      "dropoff": [
+        10,
+        22
+      ],
+      "payout": 180.0,
+      "deadline": "2025-09-01T12:10:00",
+      "weight": 1,
+      "priority": 0,
+      "release_time": 0
+    }
+  ],
+  "game_state": {
+    "total_earnings": 180,
+    "income_goal": 1000,
+    "game_over": false,
+    "victory": false,
+    "game_over_reason": "",
+    "orders_completed": 0,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "current_streak": 0,
+    "best_streak": 0,
+    "start_time": "2025-09-20T19:49:29.206285"
+  },
+  "game_time": {
+    "elapsed_time_sec": 45.214
+  },
+  "weather_state": {
+    "current_condition": "storm",
+    "current_intensity": 0.4984721448750521,
+    "current_multiplier": 0.7773666666666667
+  },
+  "camera_position": [
+    0,
+    0
+  ],
+  "income_goal": 1000,
+  "map_reference": {
+    "width": 30,
+    "height": 30,
+    "city_name": "TigerCity"
+  }
+}
