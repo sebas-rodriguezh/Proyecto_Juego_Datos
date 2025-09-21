@@ -145,9 +145,13 @@ class GameEngine:
         self.ui_manager = UIManager(self.screen, self.game_map, self.screen_width, self.screen_height)
         self.interaction_manager = InteractionManager(self.player, self.active_orders, self.completed_orders)
         
+        # NUEVO: Dar acceso al interaction_manager desde ui_manager
+        self.ui_manager.interaction_manager = self.interaction_manager
+        
         # Variables de cámara
         self.camera_x, self.camera_y = 0, 0
     
+    # game_engine.py - CORRECCIÓN para pasar game_map al interaction manager
     def handle_events(self):
         """Maneja todos los eventos del juego"""
         for event in pygame.event.get():
@@ -187,7 +191,8 @@ class GameEngine:
             self.ui_manager.handle_event(event, self.active_orders, self.player)
             
             if not self.game_state.game_over:
-                self.interaction_manager.handle_event(event, self.game_state)
+                # CORRECCIÓN: Pasar game_map al interaction_manager
+                self.interaction_manager.handle_event(event, self.game_state, self.game_map)  # ← AQUÍ
             
             # NUEVO: Guardar estado después de interacciones importantes
             if not self.game_state.game_over:
@@ -294,7 +299,9 @@ class GameEngine:
         
         # Dibujar mensajes y overlays
         self.ui_manager.draw_messages()
-        self.ui_manager.draw_interaction_hints(self.player, self.active_orders, self.camera_x, self.camera_y)
+        
+        # CORRECCIÓN: Pasar game_map a draw_interaction_hints
+        self.ui_manager.draw_interaction_hints(self.player, self.active_orders, self.camera_x, self.camera_y, self.game_map)
         
         if self.game_state.game_over:
             self.ui_manager.draw_game_over_screen(self.game_state)

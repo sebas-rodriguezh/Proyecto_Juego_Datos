@@ -58,14 +58,28 @@ class OrderList:
                 return order
         return None
     
-    def remove_by_id(self, order_id: str) -> bool:
-        """Remueve una orden por su ID (rompe la estructura de cola, usar con cuidado)"""
-        for i, order in enumerate(self._orders):
-            if order.id == order_id:
-                del self._orders[i]
-                return True
-        return False
+    # def remove_by_id(self, order_id: str) -> bool:
+    #     """Remueve una orden por su ID (rompe la estructura de cola, usar con cuidado)"""
+    #     for i, order in enumerate(self._orders):
+    #         if order.id == order_id:
+    #             del self._orders[i]
+    #             return True
+    #     return False
     
+    def remove_by_id(self, order_id: str) -> bool:
+        """Remueve una orden por su ID manteniendo la estructura de cola"""
+        # Crear una nueva cola sin el elemento a eliminar
+        new_orders = deque()
+        removed = False
+        for order in self._orders:
+            if order.id == order_id and not removed:
+                removed = True  # Remover solo la primera ocurrencia
+                continue
+            new_orders.append(order)
+        
+        self._orders = new_orders
+        return removed
+
     def get_highest_priority(self) -> int:
         """Obtiene la prioridad más alta de todas las órdenes"""
         if self.is_empty():

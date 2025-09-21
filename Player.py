@@ -124,8 +124,8 @@ class Player:
             return False
             
         tile_char = tiles[new_y][new_x]
-        # if self.legend.get(tile_char, {}).get("blocked", False):
-        #     return False
+        if self.legend.get(tile_char, {}).get("blocked", False):
+            return False
         
         self.speed_system.actualizar_peso(self.current_weight)
         self.speed_system.actualizar_reputacion(self.reputation)
@@ -251,19 +251,26 @@ class Player:
         """Verifica si el jugador está EXACTAMENTE en una ubicación"""
         return self.grid_x == location[0] and self.grid_y == location[1]
     
-    def is_adjacent_to_location(self, location):
+    def is_adjacent_to_location(self, location, radius=4):
         """NUEVO: Verifica si el jugador está adyacente (incluye diagonal) a una ubicación"""
         dx = abs(self.grid_x - location[0])
         dy = abs(self.grid_y - location[1])
         
         # Adyacente incluye las 8 direcciones: arriba, abajo, izquierda, derecha y diagonales
-        return dx <= 1 and dy <= 1 and (dx != 0 or dy != 0)
-    
-    def is_near_location(self, location, include_exact=True):
-        """NUEVO: Verifica si está en la ubicación exacta O adyacente"""
+        return dx <= radius and dy <= radius and (dx != 0 or dy != 0)
+
+
+    def is_near_location(self, location, include_exact=True, radius=2):
+        """Verifica si está en la ubicación exacta O adyacente con radio"""
         if include_exact and self.is_at_location(location):
             return True
-        return self.is_adjacent_to_location(location)
+        
+        # Calcular distancia Manhattan
+        distance_x = abs(self.grid_x - location[0])
+        distance_y = abs(self.grid_y - location[1])
+        
+        # Está cerca si está dentro del radio en ambas direcciones
+        return distance_x <= radius and distance_y <= radius
     
     def get_adjacent_positions(self):
         """NUEVO: Retorna todas las posiciones adyacentes al jugador"""
@@ -275,35 +282,78 @@ class Player:
                 adjacent.append((self.grid_x + dx, self.grid_y + dy))
         return adjacent
     
-    def get_interactable_orders(self, orders):
-        """NUEVO: Obtiene órdenes con las que puede interactuar (exacta + adyacente)"""
+    def get_interactable_orders(self, orders, game_map, radius=1):
+        """Obtiene órdenes interactuables considerando si son edificios - CORREGIDO"""
         interactable = []
         
+        # 1. Primero verificar pedidos para RECOGER (de la lista de órdenes activas)
         for order in orders:
-            # Verificar recogida (si no está en inventario)
-            if self.inventory.find_by_id(order.id) is None:
-                if self.is_near_location(order.pickup):
+            # Verificar que el pedido aún esté activo (no completado)
+            if hasattr(self, 'completed_orders') and self.completed_orders.find_by_id(order.id):
+                continue  # Saltar pedidos ya completados
+                
+            # VERIFICAR que las coordenadas estén dentro del mapa
+            pickup_x, pickup_y = order.pickup
+            dropoff_x, dropoff_y = order.dropoff
+            
+            # Si las coordenadas están fuera del mapa, saltar esta orden
+            if not (0 <= pickup_y < len(game_map.tiles) and 0 <= pickup_x < len(game_map.tiles[0])):
+                continue
+            if not (0 <= dropoff_y < len(game_map.tiles) and 0 <= dropoff_x < len(game_map.tiles[0])):
+                continue
+                
+            # Determinar si el pickup es en un edificio
+            pickup_tile = game_map.tiles[pickup_y][pickup_x]
+            is_pickup_building = game_map.legend.get(pickup_tile, {}).get("blocked", False)
+            
+            # Verificar si el pedido NO está en el inventario y se puede recoger
+            order_in_inventory = self.inventory.find_by_id(order.id) is not None
+            order_completed = hasattr(self, 'completed_orders') and self.completed_orders.find_by_id(order.id) is not None
+            
+            if not order_in_inventory and not order_completed:
+                # Para TODOS los tipos de ubicación, usar el radio especificado
+                can_pickup = self.is_near_location(order.pickup, include_exact=True, radius=radius)
+                
+                if can_pickup:
+                    distance = abs(self.grid_x - order.pickup[0]) + abs(self.grid_y - order.pickup[1])
                     interactable.append({
                         'order': order,
                         'action': 'pickup',
                         'location': order.pickup,
-                        'is_exact': self.is_at_location(order.pickup)
-                    })
-            
-            # Verificar entrega (si está en inventario)
-            elif self.inventory.find_by_id(order.id) is not None:
-                if self.is_near_location(order.dropoff):
-                    interactable.append({
-                        'order': order,
-                        'action': 'dropoff',
-                        'location': order.dropoff,
-                        'is_exact': self.is_at_location(order.dropoff)
+                        'is_exact': self.is_at_location(order.pickup),
+                        'distance': distance,
+                        'is_building': is_pickup_building
                     })
         
+        # 2. NUEVO: Ahora verificar pedidos para ENTREGAR (del inventario del jugador)
+        for order in self.inventory:
+            # Verificar que las coordenadas de entrega estén dentro del mapa
+            dropoff_x, dropoff_y = order.dropoff
+            if not (0 <= dropoff_y < len(game_map.tiles) and 0 <= dropoff_x < len(game_map.tiles[0])):
+                continue
+                
+            # Determinar si el dropoff es en un edificio
+            dropoff_tile = game_map.tiles[dropoff_y][dropoff_x]
+            is_dropoff_building = game_map.legend.get(dropoff_tile, {}).get("blocked", False)
+            
+            # Verificar si está cerca del punto de entrega
+            can_dropoff = self.is_near_location(order.dropoff, include_exact=True, radius=radius)
+            
+            if can_dropoff:
+                distance = abs(self.grid_x - order.dropoff[0]) + abs(self.grid_y - order.dropoff[1])
+                interactable.append({
+                    'order': order,
+                    'action': 'dropoff',
+                    'location': order.dropoff,
+                    'is_exact': self.is_at_location(order.dropoff),
+                    'distance': distance,
+                    'is_building': is_dropoff_building
+                })
+        
         # Priorizar interacciones exactas sobre adyacentes
-        interactable.sort(key=lambda x: not x['is_exact'])
+        interactable.sort(key=lambda x: (not x['is_exact'], x['distance']))
         return interactable
-    
+        
     def get_position(self):
         """Retorna la posición actual del jugador en el grid"""
         return (self.grid_x, self.grid_y)
@@ -314,22 +364,54 @@ class Player:
     
     # Métodos del inventario (sin cambios)
     def add_to_inventory(self, order: Order) -> bool:
+        """Añade un pedido al inventario y actualiza el peso - CON DEBUG MEJORADO"""
+        print(f"DEBUG: Intentando añadir {order.id} (peso: {order.weight}kg)")
+        print(f"DEBUG: Peso actual: {self.current_weight}kg, Capacidad máxima: {self.max_weight}kg")
+        
         if self.current_weight + order.weight <= self.max_weight:
             self.inventory.enqueue(order)
             self.current_weight += order.weight
+            print(f"DEBUG: ✅ {order.id} añadido. Nuevo peso: {self.current_weight}kg")
+            print(f"DEBUG: Inventario actual: {[order.id for order in self.inventory]}")
             return True
-        return False
+        else:
+            print(f"DEBUG: ❌ No se puede añadir {order.id}. Peso necesario: {order.weight}kg, Espacio disponible: {self.max_weight - self.current_weight}kg")
+            return False
     
     def remove_from_inventory(self, order_id: str) -> bool:
+        """Elimina un pedido del inventario por ID y actualiza el peso - CON DEBUG MEJORADO"""
+        print(f"DEBUG: Intentando remover {order_id}")
+        print(f"DEBUG: Peso antes de remover: {self.current_weight}kg")
+        print(f"DEBUG: Inventario antes: {[order.id for order in self.inventory]}")
+        
         order = self.inventory.find_by_id(order_id)
         if order:
-            self.current_weight -= order.weight
-            self.completed_orders.enqueue(order)
-            self.inventory.remove_by_id(order_id)
-            self.reputation = min(100, self.reputation + 5)
-            return True
-        return False
-    
+            # PRIMERO remover el pedido del inventario
+            removed = self.inventory.remove_by_id(order_id)
+            if removed:
+                # SOLO si se removió correctamente, actualizar el peso
+                self.current_weight -= order.weight
+                print(f"DEBUG: ✅ {order_id} removido. Peso reducido en {order.weight}kg")
+                print(f"DEBUG: Peso después de remover: {self.current_weight}kg")
+                print(f"DEBUG: Inventario después: {[order.id for order in self.inventory]}")
+                return True
+            else:
+                print(f"ERROR: No se pudo remover {order_id} del inventario")
+                return False
+        else:
+            print(f"ERROR: Pedido {order_id} no encontrado en inventario")
+            return False
+  
+    def verify_weight_consistency(self):
+        """Verifica que el peso actual coincida con el inventario"""
+        calculated_weight = sum(order.weight for order in self.inventory)
+        if self.current_weight != calculated_weight:
+            print(f"ERROR: Inconsistencia de peso! Actual: {self.current_weight}, Calculado: {calculated_weight}")
+            # Corregir automáticamente
+            self.current_weight = calculated_weight
+            print(f"Peso corregido a: {self.current_weight}kg")
+        return self.current_weight == calculated_weight
+
     def can_pickup_order(self, order: Order) -> bool:
         return self.current_weight + order.weight <= self.max_weight
     

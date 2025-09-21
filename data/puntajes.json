@@ -30,6 +30,16 @@
     "game_duration": 12.236345
   },
   {
+    "score": 158,
+    "earnings": 144,
+    "orders_completed": 0,
+    "orders_cancelled": 0,
+    "best_streak": 0,
+    "victory": true,
+    "date": "2025-09-20T22:14:03.898994",
+    "game_duration": 6.352647
+  },
+  {
     "score": 0,
     "earnings": 0,
     "orders_completed": 0,
