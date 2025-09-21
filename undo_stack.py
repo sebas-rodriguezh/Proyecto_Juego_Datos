@@ -167,7 +167,7 @@ class UndoRedoManager:
             # Restaurar stats del jugador
             game_engine.player.stamina = snapshot.player_stats['stamina']
             game_engine.player.reputation = snapshot.player_stats['reputation']
-            game_engine.player.current_weight = snapshot.player_stats['current_weight']
+            #game_engine.player.current_weight = snapshot.player_stats['current_weight']
             game_engine.player.state = snapshot.player_stats['state']
             
             # Restaurar earnings
