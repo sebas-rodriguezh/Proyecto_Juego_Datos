@@ -104,7 +104,7 @@ class UIManager:
         self.draw_inventory(cols, player)
         self.draw_weather_info(cols, weather_system, player)
         self.draw_available_jobs(cols, active_orders, weather_system, player)
-        self.draw_legend(cols)
+        #self.draw_legend(cols)
         
         # NUEVO: Dibujar controles SOLO si están activos (en esquina inferior izquierda)
         if self.show_inventory_controls:
@@ -238,17 +238,26 @@ class UIManager:
             for i, order in enumerate(player.inventory):
                 y_pos = 235 + i * 45
                 
-                # Color según prioridad
+                # Usar el color original del pedido (mismo que en el mapa)
+                bg_color = order.color
+                
+                # Ajustar el color de fondo para que sea más claro (mejor contraste con texto)
+                light_bg_color = (
+                    min(255, bg_color[0] + 50),
+                    min(255, bg_color[1] + 50), 
+                    min(255, bg_color[2] + 50)
+                )
+                
+                # Determinar color de borde basado en prioridad
                 if order.priority > 0:
-                    bg_color = (255, 200, 200)  # Rojo claro para prioritarios
-                    border_color = (200, 0, 0)   # Rojo
+                    border_color = (200, 0, 0)   # Rojo para prioritarios
                     priority_icon = "🚨 "  # Icono de alerta
                 else:
-                    bg_color = (200, 255, 200)  # Verde claro para normales
-                    border_color = (0, 150, 0)   # Verde
+                    border_color = (0, 150, 0)   # Verde para normales
                     priority_icon = ""           # Sin icono
                 
-                pygame.draw.rect(self.screen, bg_color, (x_offset + 10, y_pos, 280, 40))
+                # Dibujar caja de inventario
+                pygame.draw.rect(self.screen, light_bg_color, (x_offset + 10, y_pos, 280, 40))
                 pygame.draw.rect(self.screen, border_color, (x_offset + 10, y_pos, 280, 40), 2)
                 
                 # Información del pedido
@@ -338,43 +347,67 @@ class UIManager:
     def draw_order_markers(self, active_orders, player, camera_x, camera_y):
         """Dibuja los marcadores de trabajos en el mapa"""
         for i, order in enumerate(active_orders):
-            color = self.job_colors[i % len(self.job_colors)]
+            # Usar el color del pedido en lugar de job_colors[i]
+            color = order.color
             
-            # Si el trabajo está en el inventario, usar color verde
-            if player.inventory.find_by_id(order.id) is not None:
-                color = (0, 255, 0)
+            # Verificar si el pedido está en el inventario
+            in_inventory = player.inventory.find_by_id(order.id) is not None
             
             # Dibujar punto de recogida
             pickup_x, pickup_y = order.pickup
-            pygame.draw.circle(self.screen, color, 
-                             (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
-                              pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
-                             7)
-            pygame.draw.circle(self.screen, (255, 255, 255), 
-                             (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
-                              pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
-                             7, 1)
+            if in_inventory:
+                # Si está en inventario, dibujar con borde más grueso
+                pygame.draw.circle(self.screen, color, 
+                                (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                                pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
+                                7)
+                pygame.draw.circle(self.screen, (255, 255, 255), 
+                                (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                                pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
+                                7, 1)  # Borde más grueso para indicar que fue recogido
+            else:
+                # Normal si no está en inventario
+                pygame.draw.circle(self.screen, color, 
+                                (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                                pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
+                                7)
+                pygame.draw.circle(self.screen, (255, 255, 255), 
+                                (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                                pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
+                                7, 1)
             
             # Dibujar punto de entrega
             dropoff_x, dropoff_y = order.dropoff
-            pygame.draw.rect(self.screen, color, 
-                           (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
-                            dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
-                            10, 10))
-            pygame.draw.rect(self.screen, (255, 255, 255), 
-                           (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
-                            dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
-                            10, 10), 1)
+            if in_inventory:
+                # Si está en inventario, dibujar con borde más grueso
+                pygame.draw.rect(self.screen, color, 
+                            (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
+                                dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
+                                10, 10))
+                pygame.draw.rect(self.screen, (255, 255, 255), 
+                            (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
+                                dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
+                                10, 10), 2)  # Borde más grueso
+            else:
+                # Normal si no está en inventario
+                pygame.draw.rect(self.screen, color, 
+                            (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
+                                dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
+                                10, 10))
+                pygame.draw.rect(self.screen, (255, 255, 255), 
+                            (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
+                                dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
+                                10, 10), 1)
             
-            # Dibujar línea conectando recogida y entrega (solo si no está en inventario)
-            if player.inventory.find_by_id(order.id) is None:
+            # Dibujar línea conectando recogida y entrega SOLO si NO está en inventario
+            if not in_inventory:
                 pygame.draw.line(self.screen, color, 
-                               (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                            (pickup_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
                                 pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y),
-                               (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
+                            (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x, 
                                 dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
-                               2)
-    
+                            2)   
+
     def draw_messages(self):
         """Dibuja mensajes temporales"""
         if self.message:

@@ -132,19 +132,23 @@ class OrderList:
         """Crea una OrderList directamente desde la respuesta de la API"""
         order_list = cls()
         
-        # Procesar cada orden de la respuesta de la API
-        for order_data in api_response['data']:
-            # Convertir el string de deadline a datetime si es necesario
+        job_colors = [
+            (255, 100, 100), (100, 100, 255), (255, 255, 100),
+            (255, 100, 255), (100, 255, 255)
+        ]
+        
+        for i, order_data in enumerate(api_response['data']):
             if isinstance(order_data['deadline'], str):
                 try:
                     deadline = datetime.strptime(order_data['deadline'], '%Y-%m-%dT%H:%M')
                 except ValueError:
-                    # Si falla el parsing, usar datetime actual como fallback
                     deadline = datetime.now()
             else:
                 deadline = order_data['deadline']
             
-            # Crear la orden
+            color_index = i % len(job_colors)
+            color = job_colors[color_index]
+            
             order = Order(
                 id=order_data['id'],
                 pickup=order_data['pickup'],
@@ -153,9 +157,10 @@ class OrderList:
                 deadline=deadline,
                 weight=order_data['weight'],
                 priority=order_data['priority'],
-                release_time=order_data['release_time']
+                release_time=order_data['release_time'],
+                color=color
             )
-            order_list.enqueue(order)  # Usar enqueue en lugar de append
+            order_list.enqueue(order)
         
         return order_list
     

@@ -1,5 +1,15 @@
 [
   {
+    "score": 1229,
+    "earnings": 1118,
+    "orders_completed": 0,
+    "orders_cancelled": 0,
+    "best_streak": 0,
+    "victory": true,
+    "date": "2025-09-20T17:31:40.964321",
+    "game_duration": 162.944714
+  },
+  {
     "score": 198,
     "earnings": 180,
     "orders_completed": 0,

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List
 
@@ -12,7 +12,8 @@ class Order:
     weight: int
     priority: int
     release_time: int
-    
+    color: tuple = field(default_factory=lambda: (100, 100, 255)) 
+
     @classmethod
     def from_dict(cls, data: dict):
         return cls(
