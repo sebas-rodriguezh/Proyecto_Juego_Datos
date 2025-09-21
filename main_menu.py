@@ -1,6 +1,7 @@
-# main_menu.py - MEJORADO PARA MANEJAR EVENTOS
+# main_menu.py - MEJORADO PARA MANEJAR EVENTOS Y GUARDADO/CARGA
 import pygame
 import sys
+from save_load_manager import SaveLoadManager
 
 class MainMenu:
     def __init__(self, screen):
@@ -25,8 +26,34 @@ class MainMenu:
             {"text": "Salir", "action": "quit"}
         ]
         
+        # Sistema de guardado/carga
+        self.save_manager = SaveLoadManager()
+        self.save_slots = self.get_save_slots()
         self.selected_option = 0
+        self.selected_save_slot = None
+        self.show_save_slots = False
         self.background = self.create_background()
+    
+    def get_save_slots(self):
+        """Obtiene información de partidas guardadas"""
+        saves = self.save_manager.list_saves()
+        save_slots = []
+        
+        for i in range(1, 4):  # 3 slots de guardado
+            slot_name = f"slot{i}"
+            if slot_name in saves:
+                info = saves[slot_name]
+                save_slots.append({
+                    "name": slot_name,
+                    "info": f"${info.get('earnings', 0)} - {info.get('orders_completed', 0)} pedidos"
+                })
+            else:
+                save_slots.append({
+                    "name": slot_name,
+                    "info": "Vacío"
+                })
+        
+        return save_slots
     
     def create_background(self):
         """Crea un fondo atractivo para el menú"""
@@ -47,14 +74,34 @@ class MainMenu:
                 return "quit"
             
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    self.selected_option = (self.selected_option - 1) % len(self.options)
-                elif event.key == pygame.K_DOWN:
-                    self.selected_option = (self.selected_option + 1) % len(self.options)
-                elif event.key == pygame.K_RETURN:
-                    return self.options[self.selected_option]["action"]
-                elif event.key == pygame.K_ESCAPE:
-                    return "quit"
+                if self.show_save_slots:
+                    # Navegación en menú de partidas guardadas
+                    if event.key == pygame.K_UP:
+                        self.selected_save_slot = (self.selected_save_slot - 1) % len(self.save_slots)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_save_slot = (self.selected_save_slot + 1) % len(self.save_slots)
+                    elif event.key == pygame.K_RETURN:
+                        if self.selected_save_slot is not None:
+                            slot_name = self.save_slots[self.selected_save_slot]["name"]
+                            return f"load_{slot_name}"
+                    elif event.key == pygame.K_ESCAPE:
+                        self.show_save_slots = False
+                        self.selected_save_slot = None
+                else:
+                    # Navegación en menú principal
+                    if event.key == pygame.K_UP:
+                        self.selected_option = (self.selected_option - 1) % len(self.options)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_option = (self.selected_option + 1) % len(self.options)
+                    elif event.key == pygame.K_RETURN:
+                        action = self.options[self.selected_option]["action"]
+                        if action == "load_game":
+                            self.show_save_slots = True
+                            self.selected_save_slot = 0
+                        else:
+                            return action
+                    elif event.key == pygame.K_ESCAPE:
+                        return "quit"
         
         return None
     
@@ -62,6 +109,13 @@ class MainMenu:
         # Dibujar fondo
         self.screen.blit(self.background, (0, 0))
         
+        if self.show_save_slots:
+            self.draw_save_slots()
+        else:
+            self.draw_main_menu()
+    
+    def draw_main_menu(self):
+        """Dibuja el menú principal"""
         # Título
         title = self.font_large.render("COURIER QUEST", True, (255, 215, 0))  # Dorado
         title_shadow = self.font_large.render("COURIER QUEST", True, (150, 100, 0))
@@ -88,6 +142,28 @@ class MainMenu:
         
         # Instrucciones
         instructions = self.font_small.render("Usa ↑↓ para navegar, ENTER para seleccionar, ESC para salir", 
+                                            True, (150, 150, 150))
+        self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
+    
+    def draw_save_slots(self):
+        """Dibuja la selección de partidas guardadas"""
+        title = self.font_large.render("SELECCIONAR PARTIDA", True, (255, 215, 0))
+        self.screen.blit(title, (self.width // 2 - title.get_width() // 2, 50))
+        
+        # Dibujar slots de guardado
+        for i, slot in enumerate(self.save_slots):
+            if i == self.selected_save_slot:
+                color = (255, 215, 0)
+                slot_text = self.font_medium.render(f"> {slot['name']}: {slot['info']} <", True, color)
+            else:
+                color = (200, 200, 200)
+                slot_text = self.font_medium.render(f"{slot['name']}: {slot['info']}", True, color)
+            
+            y_pos = 150 + i * 50
+            self.screen.blit(slot_text, (self.width // 2 - slot_text.get_width() // 2, y_pos))
+        
+        # Instrucciones
+        instructions = self.font_small.render("ENTER para cargar, ESC para volver", 
                                             True, (150, 150, 150))
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
 

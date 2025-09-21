@@ -66,3 +66,8 @@ class GameTime:
         # Este método se mantiene para compatibilidad, pero la lógica principal
         # está en get_elapsed_time() que se calcula on-demand
         pass
+    
+    # game_time.py - Añadir método para obtener duración total
+    def get_total_duration(self):
+        """Retorna la duración total en segundos"""
+        return self.total_duration

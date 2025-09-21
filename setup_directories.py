@@ -3,7 +3,7 @@ import os
 
 def setup_directories():
     """Crea la estructura de directorios necesaria"""
-    directories = ['api_cache', 'saves']
+    directories = ['data', 'api_cache', 'saves']  # AÑADIDO 'saves'
     
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
