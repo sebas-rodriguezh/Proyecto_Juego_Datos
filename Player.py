@@ -48,7 +48,7 @@ class Player:
     
     def load_sprites(self):
         try:
-            sprite_sheet_image = pygame.image.load("traspa.png").convert_alpha()
+            sprite_sheet_image = pygame.image.load("bicicleta.png").convert_alpha()
             original_size = sprite_sheet_image.get_size()
             
             scaled_image = pygame.Surface((self.target_size, self.target_size), pygame.SRCALPHA)
