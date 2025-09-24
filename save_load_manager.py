@@ -1,4 +1,4 @@
-# save_load_manager.py - VERSIÓN MEJORADA
+# save_load_manager.py - VERSIÓN BINARIA
 import json
 import os
 from datetime import datetime
@@ -7,7 +7,7 @@ import pickle
 import base64
 
 class SaveLoadManager:
-    """Sistema de guardado y carga del juego - VERSIÓN MEJORADA"""
+    """Sistema de guardado y carga del juego - VERSIÓN BINARIA"""
     
     SAVE_DIR = "saves"
     
@@ -15,9 +15,9 @@ class SaveLoadManager:
         os.makedirs(self.SAVE_DIR, exist_ok=True)
     
     def save_game(self, game_engine, slot_name="slot1"):
-        """Guarda el estado completo del juego"""
+        """Guarda el estado completo del juego como binario"""
         try:
-            # Crear datos de guardado
+            # Crear datos de guardado (igual que antes)
             save_data = {
                 "version": "2.0",
                 "timestamp": datetime.now().isoformat(),
@@ -37,12 +37,12 @@ class SaveLoadManager:
                 }
             }
             
-            # Guardar en archivo
+            # Guardar como binario usando pickle
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
-            with open(save_file, "w", encoding='utf-8') as f:
-                json.dump(save_data, f, indent=2, ensure_ascii=False)
+            with open(save_file, "wb") as f:  # 'wb' para escritura binaria
+                pickle.dump(save_data, f)
             
-            print(f"✅ Partida guardada correctamente en {save_file}")
+            print(f"✅ Partida guardada correctamente en {save_file} (formato binario)")
             return True
             
         except Exception as e:
@@ -52,7 +52,7 @@ class SaveLoadManager:
             return False
     
     def load_game(self, slot_name="slot1") -> Optional[Dict[str, Any]]:
-        """Carga el estado del juego desde archivo"""
+        """Carga el estado del juego desde archivo binario"""
         try:
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             
@@ -60,16 +60,62 @@ class SaveLoadManager:
                 print(f"❌ No se encontró archivo de guardado: {save_file}")
                 return None
             
-            with open(save_file, "r", encoding='utf-8') as f:
-                save_data = json.load(f)
+            with open(save_file, "rb") as f:  # 'rb' para lectura binaria
+                save_data = pickle.load(f)
             
-            print(f"✅ Partida cargada desde {save_file}")
+            print(f"✅ Partida cargada desde {save_file} (formato binario)")
             return save_data
             
         except Exception as e:
             print(f"❌ Error al cargar: {e}")
             import traceback
             traceback.print_exc()
+            return None
+    
+    def save_game_from_json(self, json_data: Dict[str, Any], slot_name="slot1"):
+        """Guarda datos JSON recibidos como archivo binario"""
+        try:
+            # Validar que sea un diccionario
+            if not isinstance(json_data, dict):
+                raise ValueError("Los datos deben ser un diccionario JSON")
+            
+            # Agregar timestamp si no existe
+            if "timestamp" not in json_data:
+                json_data["timestamp"] = datetime.now().isoformat()
+            
+            # Guardar como binario
+            save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
+            with open(save_file, "wb") as f:
+                pickle.dump(json_data, f)
+            
+            print(f"✅ JSON guardado como binario en {save_file}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error al guardar JSON como binario: {e}")
+            return False
+    
+    def load_game_to_json(self, slot_name="slot1") -> Optional[Dict[str, Any]]:
+        """Carga el archivo binario y lo devuelve como JSON/diccionario"""
+        try:
+            save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
+            
+            if not os.path.exists(save_file):
+                print(f"❌ No se encontró archivo de guardado: {save_file}")
+                return None
+            
+            with open(save_file, "rb") as f:
+                save_data = pickle.load(f)
+            
+            # Asegurarse de que sea un diccionario (JSON compatible)
+            if not isinstance(save_data, dict):
+                raise ValueError("Los datos cargados no son un diccionario válido")
+            
+            print(f"✅ Binario cargado como JSON desde {save_file}")
+            return save_data
+            
+        except Exception as e:
+            print(f"❌ Error al cargar binario como JSON: {e}")
             return None
     
     def list_saves(self):
@@ -82,21 +128,23 @@ class SaveLoadManager:
             
             if os.path.exists(save_file):
                 try:
-                    with open(save_file, "r", encoding='utf-8') as f:
-                        save_data = json.load(f)
+                    with open(save_file, "rb") as f:
+                        save_data = pickle.load(f)
                     
                     # Extraer información básica
                     saves[slot_name] = {
                         "earnings": save_data.get("game_state", {}).get("total_earnings", 0),
                         "orders_completed": save_data.get("game_state", {}).get("orders_completed", 0),
-                        "timestamp": save_data.get("timestamp", "Desconocido")
+                        "timestamp": save_data.get("timestamp", "Desconocido"),
+                        "format": "binario"
                     }
                 except Exception as e:
                     print(f"Error leyendo información de {slot_name}: {e}")
                     saves[slot_name] = {"error": "Archivo corrupto"}
         
         return saves
-    
+
+    # Los métodos de serialización se mantienen igual
     def _serialize_order_list(self, order_list):
         """Serializa una OrderList - VERSIÓN MEJORADA"""
         orders_data = []
