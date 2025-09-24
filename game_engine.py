@@ -17,6 +17,7 @@ import json
 import os
 from save_load_manager import SaveLoadManager
 from datetime import timedelta
+from OrderPopupManager import OrderPopupManager
 
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
@@ -34,7 +35,9 @@ class GameEngine:
         # Crear sistemas principales
         self.game_state = GameState()
         self.setup_display()
-        
+
+        self.popup_manager = OrderPopupManager(self.screen_width, self.screen_height)
+
         # NUEVO: Sistema de guardado/carga
         self.save_manager = SaveLoadManager()
         
@@ -375,8 +378,18 @@ class GameEngine:
         self.pending_orders = remaining_orders
         
         # Liberar pedidos que cumplieron su tiempo
+        # for order in orders_to_release:
+        #     self.active_orders.enqueue(order) 
+
         for order in orders_to_release:
-            self.active_orders.enqueue(order)       
+            if not self.popup_manager.is_popup_active():  # Solo si no hay popup activo
+                self.popup_manager.show_new_order_popup(order)
+                break  # Solo mostrar uno a la vez
+            else:
+                # Si hay popup activo, volver a poner en pendientes con delay
+                order.release_time = current_time + 5  # Intentar de nuevo en 5 segundos
+                self.pending_orders.enqueue(order)
+          
     
     def setup_managers(self):
         """Configura los managers del juego"""
@@ -396,6 +409,25 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
             
+            popup_result = self.popup_manager.handle_event(event, self.game_state, self.player, self.active_orders)
+
+            if popup_result:
+                message = popup_result.get("message", "")
+                if message:
+                    self.ui_manager.show_message(message, 3)
+
+                penalty = popup_result.get("penalty")
+                if penalty:
+                    self.player.reputation = max(0, self.player.reputation - penalty)
+                    # Actualizar estadísticas si es cancelación
+                    if popup_result.get("type") == "cancel_order" and popup_result.get("result") == "confirmed":
+                        self.game_state.orders_cancelled += 1            
+
+            # AÑADIR: Manejar cancelación desde inventario (click derecho)
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Click derecho
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                self.handle_inventory_right_click(mouse_x, mouse_y)            
+
             # Manejo de undo/redo
             if event.type == pygame.KEYDOWN:
                 # Undo con Ctrl+Z
@@ -444,7 +476,26 @@ class GameEngine:
             # Guardar estado después de interacciones importantes
             if not self.game_state.game_over:
                 self.undo_manager.save_game_state(self)
-    
+
+    def handle_inventory_right_click(self, mouse_x, mouse_y):
+        """Maneja cancelación de pedidos desde el inventario con click derecho"""
+        # Verificar si el click está en el área del inventario
+        cols = self.game_map.width
+        x_offset = cols * self.game_map.tile_size
+        
+        if mouse_x > x_offset:  # Está en el sidebar
+            # Calcular qué pedido del inventario fue clickeado
+            inventory_start_y = 235
+            item_height = 45
+            
+            if mouse_y >= inventory_start_y and self.player.inventory:
+                item_index = (mouse_y - inventory_start_y) // item_height
+                
+                if 0 <= item_index < len(self.player.inventory):
+                    order = self.player.inventory[item_index]
+                    self.popup_manager.show_cancel_order_popup(order)
+
+
     def update(self, dt):
         """Actualiza todos los sistemas del juego"""
         if not self.game_state.game_over:
@@ -462,6 +513,7 @@ class GameEngine:
             
             # Actualizar estado del juego
             self.update_game_state()
+            self.popup_manager.update(dt)
             
             # Guardar estado periódicamente durante movimiento
             if self.player.is_moving:
@@ -551,7 +603,9 @@ class GameEngine:
         
         if self.game_state.game_over:
             self.ui_manager.draw_game_over_screen(self.game_state)
-        
+
+        self.popup_manager.draw_new_order_popup(self.screen)
+        self.popup_manager.draw_cancel_order_popup(self.screen) 
         pygame.display.flip()
     
     def render_map(self):

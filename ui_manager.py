@@ -227,6 +227,52 @@ class UIManager:
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height))
         pygame.draw.rect(self.screen, color, (x, y, width * progress, height))
     
+    # def draw_inventory(self, cols, player):
+    #     """Dibuja el inventario mostrando prioridades"""
+    #     x_offset = cols * self.game_map.tile_size
+        
+    #     inventory_title = self.font_medium.render("Inventario:", True, (0, 0, 0))
+    #     self.screen.blit(inventory_title, (x_offset + 10, 210))
+        
+    #     if player.inventory:
+    #         for i, order in enumerate(player.inventory):
+    #             y_pos = 235 + i * 45
+                
+    #             # Usar el color original del pedido (mismo que en el mapa)
+    #             bg_color = order.color
+                
+    #             # Ajustar el color de fondo para que sea más claro (mejor contraste con texto)
+    #             light_bg_color = (
+    #                 min(255, bg_color[0] + 50),
+    #                 min(255, bg_color[1] + 50), 
+    #                 min(255, bg_color[2] + 50)
+    #             )
+                
+    #             # Determinar color de borde basado en prioridad
+    #             if order.priority > 0:
+    #                 border_color = (200, 0, 0)   # Rojo para prioritarios
+    #                 priority_icon = "🚨 "  # Icono de alerta
+    #             else:
+    #                 border_color = (0, 150, 0)   # Verde para normales
+    #                 priority_icon = ""           # Sin icono
+                
+    #             # Dibujar caja de inventario
+    #             pygame.draw.rect(self.screen, light_bg_color, (x_offset + 10, y_pos, 280, 40))
+    #             pygame.draw.rect(self.screen, border_color, (x_offset + 10, y_pos, 280, 40), 2)
+                
+    #             # Información del pedido
+    #             order_text = f"{priority_icon}{order.id}"
+    #             order_surface = self.font_small.render(order_text, True, (0, 0, 0))
+    #             self.screen.blit(order_surface, (x_offset + 15, y_pos + 5))
+                
+    #             # Información adicional
+    #             info_text = f"P:{order.priority} | ${order.payout} | {order.weight} kg | {order.deadline.strftime('%H:%M')}"
+    #             info_surface = self.font_small.render(info_text, True, (80, 80, 80))
+    #             self.screen.blit(info_surface, (x_offset + 15, y_pos + 20))
+    #     else:
+    #         no_items = self.font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
+    #         self.screen.blit(no_items, (x_offset + 15, 235))
+
     def draw_inventory(self, cols, player):
         """Dibuja el inventario mostrando prioridades"""
         x_offset = cols * self.game_map.tile_size
@@ -272,6 +318,8 @@ class UIManager:
         else:
             no_items = self.font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
             self.screen.blit(no_items, (x_offset + 15, 235))
+
+
 
     def draw_weather_info(self, cols, weather_system, player):
         """Dibuja información del clima"""
