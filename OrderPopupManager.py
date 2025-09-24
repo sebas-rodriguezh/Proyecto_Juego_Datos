@@ -11,7 +11,7 @@ class OrderPopupManager:
         # Estado del popup de nuevo pedido
         self.pending_order = None  # Pedido esperando respuesta
         self.popup_timer = 0
-        self.popup_duration = 10.0  # 10 segundos para decidir
+        self.popup_duration = 30.0 
         self.popup_active = False
         
         # Estado del popup de cancelación
@@ -239,10 +239,10 @@ class OrderPopupManager:
     
     def get_popup_position(self):
         """Calcula la posición del popup de nuevo pedido"""
-        popup_width, popup_height = 350, 200
-        # Posición en esquina superior derecha
-        popup_x = self.screen_width - popup_width - 20
-        popup_y = 20
+        popup_width, popup_height = 280, 150
+        # Posición en esquina inferior derecha
+        popup_x = self.screen_width - popup_width - 10
+        popup_y = self.screen_height - popup_height - 10
         return popup_x, popup_y
     
     def draw_new_order_popup(self, screen):
@@ -252,7 +252,7 @@ class OrderPopupManager:
         
         order = self.pending_order
         popup_x, popup_y = self.get_popup_position()
-        popup_width, popup_height = 350, 200
+        popup_width, popup_height = 280, 150
         
         # Fondo del popup con transparencia
         popup_surface = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
@@ -272,34 +272,31 @@ class OrderPopupManager:
         pygame.draw.rect(screen, border_color, (popup_x, popup_y, popup_width, popup_height), 3)
         
         # Título
-        priority_text = "🚨 PEDIDO PRIORITARIO" if order.priority > 0 else "📦 NUEVO PEDIDO"
-        title = self.font_large.render(priority_text, True, border_color)
-        screen.blit(title, (popup_x + 10, popup_y + 10))
+        priority_text = "PEDIDO PRIORITARIO" if order.priority > 0 else "NUEVO PEDIDO"
+        title = self.font_medium.render(priority_text, True, border_color)
+        screen.blit(title, (popup_x + 10, popup_y + 8))
         
         # Información del pedido
         info_lines = [
             f"ID: {order.id}",
-            f"Pago: ${order.payout}",
-            f"Peso: {order.weight}kg",
             f"Prioridad: {order.priority}",
+            f"Pago: ${order.payout} | Peso: {order.weight}kg",
             f"Límite: {order.deadline.strftime('%H:%M')}",
-            f"Recogida: {order.pickup}",
-            f"Entrega: {order.dropoff}"
+            f"De: {order.pickup} -> A: {order.dropoff}"
         ]
         
         for i, line in enumerate(info_lines):
             text = self.font_small.render(line, True, (0, 0, 0))
-            screen.blit(text, (popup_x + 15, popup_y + 40 + i * 18))
+            screen.blit(text, (popup_x + 15, popup_y + 30 + i * 14))
         
         # Timer countdown
-        timer_text = f"⏰ Tiempo restante: {int(self.popup_timer)}s"
+        timer_text = f"Tiempo restante: {int(self.popup_timer)}s"
         timer_color = (255, 0, 0) if self.popup_timer < 3 else (0, 0, 0)
         timer_surface = self.font_small.render(timer_text, True, timer_color)
-        screen.blit(timer_surface, (popup_x + 15, popup_y + 165))
+        screen.blit(timer_surface, (popup_x + 15, popup_y + 100))
         
-        # Botones
         # Botón Aceptar
-        accept_button_rect = pygame.Rect(popup_x + 50, popup_y + popup_height - 40, 100, 30)
+        accept_button_rect = pygame.Rect(popup_x + 40, popup_y + popup_height - 35, 80, 25)  
         pygame.draw.rect(screen, (0, 200, 0), accept_button_rect)
         pygame.draw.rect(screen, (0, 150, 0), accept_button_rect, 2)
         
@@ -309,7 +306,7 @@ class OrderPopupManager:
         screen.blit(accept_text, (text_x, text_y))
         
         # Botón Rechazar
-        reject_button_rect = pygame.Rect(popup_x + 200, popup_y + popup_height - 40, 100, 30)
+        reject_button_rect = pygame.Rect(popup_x + 160, popup_y + popup_height - 35, 80, 25) 
         pygame.draw.rect(screen, (200, 0, 0), reject_button_rect)
         pygame.draw.rect(screen, (150, 0, 0), reject_button_rect, 2)
         
@@ -318,10 +315,6 @@ class OrderPopupManager:
         text_y = reject_button_rect.centery - reject_text.get_height() // 2
         screen.blit(reject_text, (text_x, text_y))
         
-        # Instrucciones
-        instruction_text = "Click en los botones o presiona Y/N"
-        instruction_surface = self.font_small.render(instruction_text, True, (100, 100, 100))
-        screen.blit(instruction_surface, (popup_x + 10, popup_y + popup_height - 15))
     
     def draw_cancel_order_popup(self, screen):
         """Dibuja el popup de cancelación de pedido"""
@@ -342,7 +335,7 @@ class OrderPopupManager:
         pygame.draw.rect(screen, (200, 100, 0), (popup_x, popup_y, popup_width, popup_height), 3)
         
         # Título
-        title = self.font_large.render("⚠️ CANCELAR PEDIDO", True, (200, 100, 0))
+        title = self.font_large.render("CANCELAR PEDIDO", True, (200, 100, 0))
         screen.blit(title, (popup_x + 10, popup_y + 10))
         
         # Pregunta
