@@ -1,16 +1,16 @@
 {
   "version": "2.0",
-  "timestamp": "2025-09-24T11:05:01.813983",
+  "timestamp": "2025-09-24T13:42:57.161090",
   "player_data": {
-    "grid_x": 22,
-    "grid_y": 11,
-    "visual_x": 22.0,
-    "visual_y": 11.0,
-    "stamina": 15.608154387281257,
-    "reputation": 85,
+    "grid_x": 11,
+    "grid_y": 22,
+    "visual_x": 11.0,
+    "visual_y": 22.0,
+    "stamina": 47.88794931452739,
+    "reputation": 75,
     "current_weight": 0,
-    "state": "tired",
-    "direction": "right",
+    "state": "normal",
+    "direction": "down",
     "inventory": [],
     "completed_orders": []
   },
@@ -36,7 +36,9 @@
         100,
         100
       ]
-    },
+    }
+  ],
+  "pending_orders": [
     {
       "id": "REQ-002",
       "pickup": [
@@ -78,9 +80,7 @@
         255,
         100
       ]
-    }
-  ],
-  "pending_orders": [
+    },
     {
       "id": "REQ-004",
       "pickup": [
@@ -125,33 +125,33 @@
     }
   ],
   "game_state": {
-    "total_earnings": 464,
-    "income_goal": 1000,
-    "game_over": false,
-    "victory": false,
-    "game_over_reason": "",
+    "total_earnings": 144,
+    "income_goal": 100,
+    "game_over": true,
+    "victory": true,
+    "game_over_reason": "¡Victoria! Meta alcanzada",
     "orders_completed": 0,
     "orders_cancelled": 0,
     "perfect_deliveries": 0,
     "late_deliveries": 0,
     "current_streak": 0,
     "best_streak": 0,
-    "start_time": "2025-09-24T11:03:07.116968"
+    "start_time": "2025-09-24T13:42:42.943811"
   },
   "game_time": {
-    "elapsed_time_sec": 114.228,
+    "elapsed_time_sec": 13.612000000000002,
     "total_duration": 900
   },
   "weather_state": {
-    "current_condition": "clouds",
-    "current_intensity": 0.13456451071067754,
-    "current_multiplier": 0.98
+    "current_condition": "rain",
+    "current_intensity": 0.5335463678751488,
+    "current_multiplier": 0.786
   },
   "camera_position": [
     0,
     0
   ],
-  "income_goal": 1000,
+  "income_goal": 100,
   "map_info": {
     "width": 30,
     "height": 30,

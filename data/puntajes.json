@@ -1,52 +1,15 @@
 [
   {
-    "score": 1238,
-    "earnings": 1126,
-    "orders_completed": 0,
-    "orders_cancelled": 0,
-    "best_streak": 0,
-    "victory": true,
-    "date": "2025-09-20T19:04:50.633212",
-    "game_duration": 275.235086
-  },
-  {
-    "score": 1229,
-    "earnings": 1118,
-    "orders_completed": 0,
-    "orders_cancelled": 0,
-    "best_streak": 0,
-    "victory": true,
-    "date": "2025-09-20T17:31:40.964321",
-    "game_duration": 162.944714
-  },
-  {
-    "score": 198,
-    "earnings": 180,
-    "orders_completed": 0,
-    "orders_cancelled": 0,
-    "best_streak": 0,
-    "victory": true,
-    "date": "2025-09-20T12:59:00.907633",
-    "game_duration": 12.236345
-  },
-  {
+    "player_name": "Jugador",
     "score": 158,
     "earnings": 144,
     "orders_completed": 0,
     "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
     "best_streak": 0,
     "victory": true,
-    "date": "2025-09-20T22:14:03.898994",
-    "game_duration": 6.352647
-  },
-  {
-    "score": 0,
-    "earnings": 0,
-    "orders_completed": 0,
-    "orders_cancelled": 0,
-    "best_streak": 0,
-    "victory": false,
-    "date": "2025-09-20T13:03:43.965965",
-    "game_duration": 30.542763
+    "date": "2025-09-24T13:48:56.211028",
+    "game_duration": 10.373999999999999
   }
 ]

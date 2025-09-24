@@ -18,15 +18,26 @@ import os
 from save_load_manager import SaveLoadManager
 from datetime import timedelta
 from OrderPopupManager import OrderPopupManager
-
+from score_manager import score_manager
+    
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
     
     def __init__(self, load_slot=None):
         # Inicializar pygame
         pygame.init()
+        try:
+            pygame.font.init()
+            test_font = pygame.font.Font(None, 16)
+        except:
+            print("❌ Error inicializando fuentes de Pygame")
+        # ✅ PRIMERO inicializar el sistema de puntuación
         from setup_directories import setup_directories
         setup_directories()  # Esto creará la carpeta 'saves'
+        
+        # ✅ INICIALIZAR score_manager ANTES de usarlo
+        from score_manager import score_manager
+        score_manager.initialize_score_system()
         
         # Configuración inicial
         self.api = APIManager()
@@ -38,7 +49,7 @@ class GameEngine:
 
         self.popup_manager = OrderPopupManager(self.screen_width, self.screen_height)
 
-        # NUEVO: Sistema de guardado/carga
+        # Sistema de guardado/carga
         self.save_manager = SaveLoadManager()
         
         # PRIMERO cargar o crear partida (para que el player exista)
@@ -133,7 +144,7 @@ class GameEngine:
         self.game_time.start()
         
         # Configurar meta de ingresos
-        self.income_goal = self.map_data.get("goal", 1000)
+        self.income_goal = self.map_data.get("goal", 100)
         self.game_state.set_income_goal(self.income_goal)
         
         # Sistema de undo/redo
@@ -521,7 +532,6 @@ class GameEngine:
         
         # Actualizar cámara
         self.update_camera()
-    
     def update_player_movement(self, dt):
         """Actualiza el movimiento del jugador - VERSIÓN MODIFICADA"""
         
@@ -570,13 +580,51 @@ class GameEngine:
     def update_game_state(self):
         """Actualiza el estado general del juego"""
         # Verificar condiciones de victoria/derrota
-        if self.player.reputation < 20:
+        if self.player.reputation < 20 and not self.game_state.game_over:
+            print("🎮 Fin del juego: Reputación muy baja")
             self.game_state.set_game_over(False, "Derrota: Reputación muy baja")
-        elif self.game_time.is_time_up() and self.game_state.total_earnings < self.income_goal:
+            self.save_final_score(False)
+        elif self.game_time.is_time_up() and self.game_state.total_earnings < self.income_goal and not self.game_state.game_over:
+            print("🎮 Fin del juego: Tiempo agotado")
             self.game_state.set_game_over(False, "Derrota: Tiempo agotado")
-        elif self.game_state.total_earnings >= self.income_goal:
+            self.save_final_score(False)
+        elif self.game_state.total_earnings >= self.income_goal and not self.game_state.game_over:
+            print("🎮 Fin del juego: Victoria alcanzada")
             self.game_state.set_game_over(True, "¡Victoria! Meta alcanzada")
-    
+            self.save_final_score(True)
+
+    def save_final_score(self, victory: bool):
+        """Guarda la puntuación final - VERSIÓN MEJORADA"""
+        try:
+            print(f"💾 Intentando guardar puntuación final: victoria={victory}")
+            
+            # Verificar que el juego haya terminado
+            if not self.game_state.game_over:
+                print("⚠️ El juego no ha terminado, no se puede guardar puntuación")
+                return
+                
+            from score_manager import score_manager
+            
+            # Asegurar inicialización
+            if not score_manager.initialized:
+                print("🔄 Inicializando sistema de puntuación...")
+                score_manager.initialize_score_system()
+            
+            game_duration = self.game_time.get_elapsed_time()
+            print(f"⏱️ Duración del juego: {game_duration:.1f} segundos")
+            
+            # Guardar puntuación
+            success = score_manager.add_score(self.game_state, victory, game_duration)
+            
+            if success:
+                print("✅ Puntuación guardada exitosamente en el sistema")
+            else:
+                print("❌ Error al guardar puntuación en el sistema principal")
+                
+        except Exception as e:
+            print(f"❌ Error guardando puntuación final: {e}")
+            import traceback
+            traceback.print_exc()
     def render(self):
         """Renderiza todos los elementos del juego"""
         self.screen.fill((255, 255, 255))

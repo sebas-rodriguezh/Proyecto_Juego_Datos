@@ -7,6 +7,8 @@ class MainMenu:
     def __init__(self, screen):
         self.screen = screen
         self.width, self.height = screen.get_size()
+        self.show_high_scores = False
+        self.high_scores = self.load_high_scores()
         
         # Configurar fuentes
         try:
@@ -68,6 +70,8 @@ class MainMenu:
         
         return background
     
+# main_menu.py - AGREGAR ESTE MÉTODO Y MODIFICAR handle_events
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -87,6 +91,9 @@ class MainMenu:
                     elif event.key == pygame.K_ESCAPE:
                         self.show_save_slots = False
                         self.selected_save_slot = None
+                elif self.show_high_scores:  # ← NUEVO: Manejar pantalla de puntuaciones
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.show_high_scores = False
                 else:
                     # Navegación en menú principal
                     if event.key == pygame.K_UP:
@@ -98,6 +105,8 @@ class MainMenu:
                         if action == "load_game":
                             self.show_save_slots = True
                             self.selected_save_slot = 0
+                        elif action == "high_scores":  # ← NUEVO: Mostrar puntuaciones
+                            self.show_high_scores = True
                         else:
                             return action
                     elif event.key == pygame.K_ESCAPE:
@@ -109,7 +118,9 @@ class MainMenu:
         # Dibujar fondo
         self.screen.blit(self.background, (0, 0))
         
-        if self.show_save_slots:
+        if self.show_high_scores:
+            self.draw_high_scores()  # ← NUEVO
+        elif self.show_save_slots:
             self.draw_save_slots()
         else:
             self.draw_main_menu()
@@ -165,6 +176,88 @@ class MainMenu:
         # Instrucciones
         instructions = self.font_small.render("ENTER para cargar, ESC para volver", 
                                             True, (150, 150, 150))
+        self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
+        
+
+    # Agregar este método para cargar puntuaciones
+    def load_high_scores(self):
+        """Carga las puntuaciones desde el archivo"""
+        try:
+            from score_manager import score_manager
+            score_manager.initialize_score_system()
+            return score_manager.get_top_scores(10)
+        except:
+            return []
+
+    # Agregar método para dibujar pantalla de puntuaciones
+    def draw_high_scores(self):
+        """Dibuja la pantalla de puntuaciones altas"""
+        # Fondo
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))  # Fondo semitransparente
+        self.screen.blit(overlay, (0, 0))
+        
+        # Título
+        title = self.font_large.render("MEJORES PUNTUACIONES", True, (255, 215, 0))
+        self.screen.blit(title, (self.width // 2 - title.get_width() // 2, 50))
+        
+        # Encabezados de columnas
+        headers = ["POS", "JUGADOR", "PUNTUACIÓN", "GANANCIAS", "FECHA"]
+        header_y = 120
+        col_widths = [80, 150, 120, 120, 200]
+        x_pos = self.width // 2 - sum(col_widths) // 2
+        
+        for i, header in enumerate(headers):
+            text = self.font_small.render(header, True, (255, 215, 0))
+            self.screen.blit(text, (x_pos, header_y))
+            x_pos += col_widths[i]
+        
+        # Lista de puntuaciones
+        if not self.high_scores:
+            no_scores = self.font_medium.render("No hay puntuaciones guardadas", True, (200, 200, 200))
+            self.screen.blit(no_scores, (self.width // 2 - no_scores.get_width() // 2, 180))
+        else:
+            for i, score in enumerate(self.high_scores[:10]):  # Top 10
+                y_pos = 160 + i * 30
+                x_pos = self.width // 2 - sum(col_widths) // 2
+                
+                # Posición
+                pos_text = self.font_small.render(f"{i+1}.", True, (255, 255, 255))
+                self.screen.blit(pos_text, (x_pos, y_pos))
+                x_pos += col_widths[0]
+                
+                # Nombre del jugador
+                name_text = self.font_small.render(score.get("player_name", "Jugador"), True, (255, 255, 255))
+                self.screen.blit(name_text, (x_pos, y_pos))
+                x_pos += col_widths[1]
+                
+                # Puntuación
+                score_text = self.font_small.render(str(score.get("score", 0)), True, (255, 255, 255))
+                self.screen.blit(score_text, (x_pos, y_pos))
+                x_pos += col_widths[2]
+                
+                # Ganancias
+                earnings_text = self.font_small.render(f"${score.get('earnings', 0)}", True, (255, 255, 255))
+                self.screen.blit(earnings_text, (x_pos, y_pos))
+                x_pos += col_widths[3]
+                
+                # Fecha (formateada)
+                date_str = score.get("date", "")
+                if date_str:
+                    try:
+                        from datetime import datetime
+                        date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        formatted_date = date_obj.strftime("%d/%m/%Y %H:%M")
+                    except:
+                        formatted_date = date_str[:16]
+                else:
+                    formatted_date = "N/A"
+                
+                date_text = self.font_small.render(formatted_date, True, (255, 255, 255))
+                self.screen.blit(date_text, (x_pos, y_pos))
+        
+        # Instrucciones
+        instructions = self.font_small.render("Presiona ESC o ENTER para volver", True, (150, 150, 150))
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
 
 # Este código solo se ejecuta si el archivo se ejecuta directamente

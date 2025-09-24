@@ -63,8 +63,51 @@ class GameState:
         self.game_over_reason = reason
         self.end_time = datetime.now()
         
-        # Guardar puntaje final
-        self.save_high_score()
+        # Guardar puntaje final - NUEVO: Integración con ScoreManager
+        #self.save_final_score()
+    
+    def save_final_score(self):
+        """Guarda el puntaje final usando el ScoreManager"""
+        try:
+            from score_manager import score_manager
+            if self.end_time and self.start_time:
+                game_duration = (self.end_time - self.start_time).total_seconds()
+                score_manager.add_score(self, self.victory, game_duration)
+                print("✅ Puntuación guardada en el sistema de récords")
+        except Exception as e:
+            print(f"❌ Error al guardar puntuación: {e}")
+            # Fallback: guardar en archivo local
+            self._save_high_score_fallback()
+    
+    def _save_high_score_fallback(self):
+        """Método de respaldo para guardar puntuaciones"""
+        try:
+            score_data = {
+                "score": self.calculate_final_score(),
+                "earnings": self.total_earnings,
+                "orders_completed": self.orders_completed,
+                "orders_cancelled": self.orders_cancelled,
+                "best_streak": self.best_streak,
+                "victory": self.victory,
+                "date": datetime.now().isoformat(),
+                "game_duration": (self.end_time - self.start_time).total_seconds() if self.end_time else 0
+            }
+            
+            # Cargar puntajes existentes
+            scores = self.load_high_scores()
+            scores.append(score_data)
+            
+            # Ordenar por puntaje (mayor a menor) y mantener top 10
+            scores.sort(key=lambda x: x["score"], reverse=True)
+            scores = scores[:10]
+            
+            # Guardar
+            os.makedirs("data", exist_ok=True)
+            with open("data/puntajes.json", "w", encoding='utf-8') as f:
+                json.dump(scores, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"Error en fallback de guardado: {e}")
     
     def calculate_final_score(self):
         """Calcula el puntaje final del juego"""
@@ -91,32 +134,6 @@ class GameState:
         
         final_score = base_score + time_bonus + streak_bonus - cancellation_penalty - late_penalty
         return max(0, final_score)
-    
-    def save_high_score(self):
-        """Guarda el puntaje en el archivo de récords"""
-        score_data = {
-            "score": self.calculate_final_score(),
-            "earnings": self.total_earnings,
-            "orders_completed": self.orders_completed,
-            "orders_cancelled": self.orders_cancelled,
-            "best_streak": self.best_streak,
-            "victory": self.victory,
-            "date": datetime.now().isoformat(),
-            "game_duration": (self.end_time - self.start_time).total_seconds() if self.end_time else 0
-        }
-        
-        # Cargar puntajes existentes
-        scores = self.load_high_scores()
-        scores.append(score_data)
-        
-        # Ordenar por puntaje (mayor a menor) y mantener top 10
-        scores.sort(key=lambda x: x["score"], reverse=True)
-        scores = scores[:10]
-        
-        # Guardar
-        os.makedirs("data", exist_ok=True)
-        with open("data/puntajes.json", "w", encoding='utf-8') as f:
-            json.dump(scores, f, indent=2, ensure_ascii=False)
     
     def load_high_scores(self):
         """Carga los puntajes guardados"""

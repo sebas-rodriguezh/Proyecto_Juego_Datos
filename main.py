@@ -1,10 +1,23 @@
-# main.py - VERSIÓN ACTUALIZADA CON CARGA DE PARTIDAS
+# main.py - VERSIÓN ACTUALIZADA CON INICIALIZACIÓN CENTRALIZADA
 import pygame
 import sys
 from main_menu import MainMenu
+from setup_directories import setup_directories
+from score_manager import initialize_score_system
 
 def main():
     pygame.init()
+    
+    # ✅ INICIALIZACIÓN CENTRALIZADA ANTES DEL BUCLE
+    print("🎮 Iniciando Courier Quest...")
+    
+    # 1. Configurar directorios
+    setup_directories()
+    
+    # 2. Inicializar sistema de puntuación
+    score_success = initialize_score_system()
+    if not score_success:
+        print("⚠️ Continuando sin sistema de puntuación...")
     
     # Bucle principal que siempre vuelve al menú
     while True:
@@ -49,10 +62,12 @@ def main():
                 break
         except Exception as e:
             print(f"Error: {e}")
+            import traceback
+            traceback.print_exc()
             break
     
     pygame.quit()
-    sys.exit()
+    sys.exit()  
 
 if __name__ == "__main__":
     main()
