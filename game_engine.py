@@ -66,16 +66,20 @@ class GameEngine:
         self.clock = pygame.time.Clock()
         self.last_time = pygame.time.get_ticks()
     def setup_game_data(self):
-        """Carga datos iniciales de la API o caché local"""
+        """Carga datos iniciales de la API o caché local - VERSIÓN SIMPLIFICADA"""
         try:
             self.map_data = self.api.get_map_data()
             self.jobs_data = self.api.get_jobs()
             self.weather_data = self.api.get_weather()
-            print("✅ Datos cargados desde API")
+            print("✅ Datos cargados correctamente")
         except Exception as e:
-            print(f"❌ Error al conectar con la API: {e}")
-            print("🔄 Intentando cargar datos por defecto...")
-            self.load_default_data()
+            print(f"❌ Error crítico: No se pudieron cargar los datos: {e}")
+            # NO hay datos por defecto - el juego no puede continuar
+            raise Exception("No se pueden cargar datos y no hay respaldo disponible")
+
+# ELIMINA completamente la función load_default_data()
+# ELIMINA completamente la función create_default_data_files()
+# ELIMINA completamente la función create_emergency_data()
 
     def load_default_data(self):
         """Carga datos por defecto desde archivos locales"""
@@ -144,7 +148,7 @@ class GameEngine:
         self.game_time.start()
         
         # Configurar meta de ingresos
-        self.income_goal = self.map_data.get("goal", 100)
+        self.income_goal = self.map_data.get("goal", 600)
         self.game_state.set_income_goal(self.income_goal)
         
         # Sistema de undo/redo

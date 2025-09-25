@@ -21,24 +21,40 @@ class APIManager:
         os.makedirs(self.CACHE_DIR, exist_ok=True)
     
     def _make_api_call(self, endpoint, cache_filename):
-        """Realiza una llamada a la API con soporte para caché offline"""
+        """Realiza una llamada a la API con soporte mejorado para caché offline"""
+        # PRIMERO verificar si hay conexión
+        if not self.is_online():
+            print(f"📴 Modo offline - Cargando desde caché: {cache_filename}")
+            cached_data = self._load_from_cache(cache_filename)
+            
+            if cached_data:
+                print("✅ Datos cargados desde caché (modo offline)")
+                return cached_data
+            else:
+                print("❌ No hay datos en caché disponibles")
+                raise Exception(f"No hay conexión y no hay datos en caché para {endpoint}")
+        
+        # SI HAY CONEXIÓN, intentar llamada a la API
         try:
-            # Intentar llamada a la API
+            print(f"🌐 Conectado - Solicitando datos de: {endpoint}")
             response = requests.get(f"{self.base_url}{endpoint}", timeout=10)
             response.raise_for_status()
             data = response.json()
             
-            # Guardar en caché
+            # Guardar en caché (actualizar timestamp)
             self._save_to_cache(cache_filename, data)
+            print("✅ Datos obtenidos de API y guardados en caché")
             return data
             
-        except (requests.RequestException, requests.Timeout):
-            # Falló la conexión, intentar cargar desde caché
-            print(f"⚠️  No hay conexión a la API. Intentando cargar desde caché: {cache_filename}")
+        except (requests.RequestException, requests.Timeout) as e:
+            print(f"⚠️  Error de conexión a la API: {e}")
+            
+            # Falló la conexión, intentar cargar desde caché (incluso expirados)
+            print(f"🔄 Intentando cargar desde caché como respaldo: {cache_filename}")
             cached_data = self._load_from_cache(cache_filename)
             
             if cached_data:
-                print("✅ Datos cargados desde caché correctamente")
+                print("✅ Datos cargados desde caché (respaldo por error de API)")
                 return cached_data
             else:
                 print("❌ No hay datos en caché disponibles")
@@ -55,8 +71,9 @@ class APIManager:
         with open(cache_path, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2, ensure_ascii=False)
     
+# api_manager.py - MODIFICACIÓN CRÍTICA
     def _load_from_cache(self, filename):
-        """Carga datos desde el caché local si no han expirado"""
+        """Carga datos desde el caché local - VERSIÓN MEJORADA para modo offline"""
         cache_path = os.path.join(self.CACHE_DIR, filename)
         
         try:
@@ -68,13 +85,21 @@ class APIManager:
             
             # Verificar si el caché ha expirado
             cache_time = datetime.fromisoformat(cache_data["timestamp"])
-            if datetime.now() - cache_time > timedelta(hours=self.CACHE_EXPIRY_HOURS):
-                print(f"⚠️  Los datos en caché para {filename} han expirado")
-                return None
-                
-            return cache_data["data"]
+            is_expired = datetime.now() - cache_time > timedelta(hours=self.CACHE_EXPIRY_HOURS)
             
-        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            if is_expired:
+                # VERIFICAR SI HAY CONEXIÓN ANTES de descartar los datos expirados
+                if self.is_online():
+                    print(f"⚠️  Los datos en caché para {filename} han expirado y hay conexión - intentando actualizar")
+                    return None  # Descarta expirados solo si hay conexión
+                else:
+                    print(f"⚠️  Datos en caché expirados pero SIN CONEXIÓN - usando de todos modos")
+                    return cache_data["data"]  # Usa expirados como respaldo
+            else:
+                print(f"✅ Datos en caché frescos para {filename}")
+                return cache_data["data"]
+                
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError) as e:
             print(f"Error al cargar caché {filename}: {e}")
             return None
     
