@@ -1,4 +1,5 @@
-# Player.py - MODIFICADO con sistema de recogida adyacente
+# Player.py - VERSIÓN CORREGIDA con movimiento adecuado
+from datetime import datetime
 from OrderList import OrderList
 from Order import Order
 from Speed_Movement import Speed_Movement
@@ -11,21 +12,15 @@ class Player:
         self.grid_x = int(x)
         self.grid_y = int(y)
         
-        # Posición visual (para animación suave)
-        self.visual_x = float(x)
-        self.visual_y = float(y)
-        
-        # Movimiento por casillas
+        # Movimiento por casillas con cooldown
         self.is_moving = False
-        self.move_timer = 0
-        self.move_duration = 1.0  # Tiempo base para moverse 1 casilla
-        self.target_x = self.grid_x
-        self.target_y = self.grid_y
+        self.move_cooldown = 0
+        self.move_cooldown_duration = 0.3  # AUMENTADO a 300ms para movimiento más lento
         
         # Sistema de velocidad integrado
         self.speed_system = Speed_Movement(velocidad_base=3.0)
         
-        # Stats del jugador (sin cambios)
+        # Stats del jugador
         self.stamina = 100
         self.reputation = 70
         self.inventory = OrderList.create_empty()
@@ -35,22 +30,22 @@ class Player:
         self.state = "normal"
         self.direction = "right"
         
-        # Rendering (sin cambios)
+        # Rendering
         self.tile_size = tile_size
         self.legend = legend
         self.scale_factor = scale_factor
-        self.target_size = 32 * scale_factor
+        self.target_size = tile_size  # Tamaño igual al tile
         self.sprite_sheet = self.load_sprites()
         self.current_frame = 0
         self.animation_time = 0
-        self.animation_speed = 0.1
+        self.animation_speed = 0.2  # Animación más lenta
         self.current_job = None
     
     def load_sprites(self):
         try:
             sprite_sheet_image = pygame.image.load("bicicleta.png").convert_alpha()
-            original_size = sprite_sheet_image.get_size()
             
+            # Escalar al tamaño del tile
             scaled_image = pygame.Surface((self.target_size, self.target_size), pygame.SRCALPHA)
             pygame.transform.smoothscale(
                 sprite_sheet_image, 
@@ -110,41 +105,52 @@ class Player:
         return sprites
     
     def try_move(self, dx, dy, tiles, weather_multiplier, surface_multiplier):
-        """Intenta iniciar movimiento a una nueva casilla"""
-        if self.is_moving:
+        """Intenta moverse a una nueva casilla con velocidad adecuada"""
+        if self.move_cooldown > 0:
             return False
             
         if self.state == "exhausted":
+            print("❌ No se puede mover: EXHAUSTED")
             return False
         
         new_x = self.grid_x + dx
         new_y = self.grid_y + dy
         
-        if new_y < 0 or new_y >= len(tiles) or new_x < 0 or new_x >= len(tiles[0]):
-            return False
-            
-        tile_char = tiles[new_y][new_x]
-        if self.legend.get(tile_char, {}).get("blocked", False):
+        # Verificar límites del mapa y tiles bloqueados
+        if (new_y < 0 or new_y >= len(tiles) or 
+            new_x < 0 or new_x >= len(tiles[0]) or
+            self.legend.get(tiles[new_y][new_x], {}).get("blocked", False)):
             return False
         
+        # ACTUALIZAR SISTEMA DE VELOCIDAD
         self.speed_system.actualizar_peso(self.current_weight)
         self.speed_system.actualizar_reputacion(self.reputation)
         self.speed_system.cambiar_estado_resistencia(self.state)
         
+        tile_char = tiles[new_y][new_x]
         surface_type = self.legend.get(tile_char, {}).get("name", "calle")
         velocidad_final = self.speed_system.calcular_velocidad_final(surface_type)
         velocidad_final *= weather_multiplier
         
+       # print(f"🚴 Velocidad: {velocidad_final:.2f} | Estado: {self.state} | Stamina: {self.stamina:.1f}")
+        
         if velocidad_final <= 0:
+            print("❌ Velocidad <= 0, no se puede mover")
             return False
-            
-        self.move_duration = 1.0 / velocidad_final
         
-        self.target_x = new_x
-        self.target_y = new_y
-        self.is_moving = True
-        self.move_timer = 0
+        # ✅ CORRECCIÓN: Calcular consumo ANTES de mover
+        stamina_consumption = self.calculate_stamina_consumption(velocidad_final, weather_multiplier)
         
+        # Verificar si tiene suficiente stamina
+        if self.stamina - stamina_consumption < 0:
+            print("❌ Stamina insuficiente para moverse")
+            return False
+        
+        # MOVIMIENTO INSTANTÁNEO
+        self.grid_x = new_x
+        self.grid_y = new_y
+        
+        # Actualizar dirección
         if dx > 0:
             self.direction = "right"
         elif dx < 0:
@@ -153,91 +159,128 @@ class Player:
             self.direction = "down"
         elif dy < 0:
             self.direction = "up"
-            
+        
+        # ✅ CORRECCIÓN: Cooldown inversamente proporcional a la velocidad
+        base_cooldown = 0.5
+        self.move_cooldown = base_cooldown / max(0.1, velocidad_final)
+        self.move_cooldown = max(0.1, min(1.0, self.move_cooldown))
+        
+        # ✅ CORRECCIÓN: Consumir stamina DESPUÉS de moverse exitosamente
+        self.consume_stamina(stamina_consumption)
+        
+        self.is_moving = True
+        
         return True
     
+    
+    def calculate_stamina_consumption(self, velocidad_final, weather_multiplier):
+        """Calcula el consumo de stamina POR CELDA movida"""
+        # Consumo BASE por celda (según especificaciones del proyecto)
+        base_consumption = 0.5  # -0.5 base por celda como dice el documento
+        
+        # Penalización por peso (si lleva más de 3kg)
+        weight_penalty = 0
+        if self.current_weight > 3:
+            weight_penalty = 0.2 * (self.current_weight - 3)  # -0.2 por cada kg sobre 3
+        
+        # Penalización por clima adverso
+        weather_penalty = 0
+        if weather_multiplier < 0.9:  # Clima adverso
+            # Ajustar según el clima específico (rain/wind: -0.1, storm: -0.3, heat: -0.2)
+            if weather_multiplier <= 0.75:  # Storm
+                weather_penalty = 0.3
+            elif weather_multiplier <= 0.85:  # Rain
+                weather_penalty = 0.1
+            elif weather_multiplier <= 0.90:  # Light rain/heat
+                weather_penalty = 0.2
+        
+        total_consumption = base_consumption + weight_penalty + weather_penalty
+        
+        # ✅ CORRECCIÓN: Más velocidad = MÁS consumo de stamina
+        # Ajustar por velocidad (moverse rápido cansa más)
+        speed_factor = 1.0 + (3.0 - min(velocidad_final, 3.0)) * 0.3  # Velocidad baja = más esfuerzo
+        total_consumption *= speed_factor
+        
+       # print(f"💪 Consumo stamina: base={base_consumption:.2f}, peso={weight_penalty:.2f}, clima={weather_penalty:.2f}, velocidad_factor={speed_factor:.2f}")
+        
+        return total_consumption
     def update_movement(self, dt, weather_stamina_consumption=0):
-        """Actualiza el movimiento suave entre casillas"""
+        """Actualiza el cooldown del movimiento y la animación"""
+        # Actualizar cooldown
+        if self.move_cooldown > 0:
+            self.move_cooldown -= dt
+            if self.move_cooldown <= 0:
+                self.move_cooldown = 0
+                self.is_moving = False
+        
+        # Si no nos estamos moviendo, recuperar stamina
         if not self.is_moving:
             self.recover_stamina(dt)
-            return
         
-        self.move_timer += dt
-        progress = min(1.0, self.move_timer / self.move_duration)
-        
-        start_x, start_y = float(self.grid_x), float(self.grid_y)
-        target_x, target_y = float(self.target_x), float(self.target_y)
-        
-        self.visual_x = start_x + (target_x - start_x) * progress
-        self.visual_y = start_y + (target_y - start_y) * progress
-        
-        if progress >= 1.0:
-            self.grid_x = self.target_x
-            self.grid_y = self.target_y
-            self.visual_x = float(self.grid_x)
-            self.visual_y = float(self.grid_y)
-            self.is_moving = False
+        # Actualizar animación (más lenta cuando está tired/exhausted)
+        animation_modifier = 1.0
+        if self.state == "tired":
+            animation_modifier = 0.7
+        elif self.state == "exhausted":
+            animation_modifier = 0.3
             
-            self.consume_stamina(self.move_duration, weather_stamina_consumption)
-        
-        self.animation_time += dt
+        self.animation_time += dt * animation_modifier
         if self.animation_time >= self.animation_speed:
             self.animation_time = 0
             self.current_frame = (self.current_frame + 1) % 4
     
-    def consume_stamina(self, dt, weather_consumption=0):
-        print(f"=== CONSUMO STAMINA ===")
-        print(f"DT: {dt:.4f}s - Weather consumption: {weather_consumption}")
-        
-        consumption = 7 * dt
-        consumption += weather_consumption * dt
-        
-        if self.current_weight > 3:
-            weight_extra = 0.2 * (self.current_weight - 3) * dt
-            consumption += weight_extra
-            print(f"Penalización peso: +{weight_extra:.3f}")
-        
-        print(f"Consumo total: {consumption:.3f}")
-        print(f"Stamina antes: {self.stamina:.1f}")
+    def consume_stamina(self, consumption):
+        """Consume stamina directamente (sin parámetro dt)"""
+        # print(f"=== CONSUMO STAMINA ===")
+        # print(f"Consumo: {consumption:.3f}")
+        # print(f"Stamina antes: {self.stamina:.1f}")
         
         self.stamina -= consumption
-        print(f"Stamina después: {self.stamina:.1f}")
         
+        # Actualizar estado basado en stamina
         if self.stamina <= 0:
             self.state = "exhausted"
             self.stamina = 0
             print("¡¡¡EXHAUSTED!!! - Stamina agotada")
         elif self.stamina <= 30:
-            old_state = self.state
-            self.state = "tired"
-            if old_state != "tired":
+            if self.state != "tired" and self.state != "exhausted":
                 print("Estado cambiado a TIRED")
-        else:
-            old_state = self.state
-            self.state = "normal"
-            if old_state != "normal":
-                print("Estado cambiado a NORMAL")
+            self.state = "tired"
+        # else:
+        #     if self.state != "normal" and self.state != "exhausted":
+        #         print("Estado cambiado a NORMAL")
+        #     self.state = "normal"
         
-        print("======================")
-
+        # print(f"Stamina después: {self.stamina:.1f}")
+        # print(f"Estado actual: {self.state}")
+        # print("======================")
 
     def recover_stamina(self, dt, at_rest_point=False):
-        recovery_rate = 5 if not at_rest_point else 10
-        self.stamina += recovery_rate * dt
+        """Recupera stamina cuando no se está moviendo"""
+        # ✅ CORRECCIÓN: Tasas de recuperación según especificaciones
+        recovery_rate = 5.0  # +5 por segundo (base)
+        if at_rest_point:
+            recovery_rate = 10.0  # +10 por segundo en puntos de descanso
         
-        if self.stamina > 100:
-            self.stamina = 100
-            
-        # SOLO cambiar estado si NO está exhausted
-        if self.state != "exhausted":
+        recovery = recovery_rate * dt
+        
+        old_stamina = self.stamina
+        self.stamina = min(100, self.stamina + recovery)
+        
+        # Manejar transición de estado exhausted
+        if self.state == "exhausted" and self.stamina >= 30:
+            self.state = "normal"
+            print("✅ Recuperado de EXHAUSTED a NORMAL")
+        elif self.state != "exhausted":
+            # Actualizar estado normal/tired
             if self.stamina <= 30:
                 self.state = "tired"
             else:
                 self.state = "normal"
-        else:
-            # Si está exhausted, solo cambiar cuando stamina > 30
-            if self.stamina > 30:
-                self.state = "normal"
+        
+        # Debug de recuperación
+        # if recovery > 0 and abs(old_stamina - self.stamina) > 0.01:
+        #     print(f"💚 Recuperando stamina: +{recovery:.2f} (total: {self.stamina:.1f})")
 
     def reorganize_inventory_by_priority(self):
         if not self.inventory.is_empty():
@@ -248,123 +291,98 @@ class Player:
             self.inventory.reorganize_by_deadline()
     
     def is_at_location(self, location):
-        """Verifica si el jugador está EXACTAMENTE en una ubicación"""
         return self.grid_x == location[0] and self.grid_y == location[1]
     
     def is_adjacent_to_location(self, location, radius=4):
-        """NUEVO: Verifica si el jugador está adyacente (incluye diagonal) a una ubicación"""
         dx = abs(self.grid_x - location[0])
         dy = abs(self.grid_y - location[1])
-        
-        # Adyacente incluye las 8 direcciones: arriba, abajo, izquierda, derecha y diagonales
         return dx <= radius and dy <= radius and (dx != 0 or dy != 0)
 
-
     def is_near_location(self, location, include_exact=True, radius=2):
-        """Verifica si está en la ubicación exacta O adyacente con radio"""
         if include_exact and self.is_at_location(location):
             return True
-        
-        # Calcular distancia Manhattan
         distance_x = abs(self.grid_x - location[0])
         distance_y = abs(self.grid_y - location[1])
-        
-        # Está cerca si está dentro del radio en ambas direcciones
         return distance_x <= radius and distance_y <= radius
     
     def get_adjacent_positions(self):
-        """NUEVO: Retorna todas las posiciones adyacentes al jugador"""
         adjacent = []
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:  # Saltar posición actual
+                if dx == 0 and dy == 0:
                     continue
                 adjacent.append((self.grid_x + dx, self.grid_y + dy))
         return adjacent
     
-    def get_interactable_orders(self, orders, game_map, radius=1):
-        """Obtiene órdenes interactuables considerando si son edificios - CORREGIDO"""
+    def get_interactable_orders(self, orders, game_map, radius=1, game_time=None):
         interactable = []
         
-        # 1. Primero verificar pedidos para RECOGER (de la lista de órdenes activas)
+        if game_time is None:
+            raise ValueError("game_time es requerido para verificar expiraciones")
+        else:
+            current_time = game_time.get_current_game_time()
+        
+        # Pedidos para RECOGER
         for order in orders:
-            # Verificar que el pedido aún esté activo (no completado)
-            if hasattr(self, 'completed_orders') and self.completed_orders.find_by_id(order.id):
-                continue  # Saltar pedidos ya completados
+            if (not order.is_expired and 
+                not order.is_completed and 
+                not order.is_in_inventory and
+                not self.inventory.find_by_id(order.id)):
                 
-            # VERIFICAR que las coordenadas estén dentro del mapa
-            pickup_x, pickup_y = order.pickup
-            dropoff_x, dropoff_y = order.dropoff
-            
-            # Si las coordenadas están fuera del mapa, saltar esta orden
-            if not (0 <= pickup_y < len(game_map.tiles) and 0 <= pickup_x < len(game_map.tiles[0])):
-                continue
-            if not (0 <= dropoff_y < len(game_map.tiles) and 0 <= dropoff_x < len(game_map.tiles[0])):
-                continue
+                if order.check_expiration(current_time):
+                    continue
                 
-            # Determinar si el pickup es en un edificio
-            pickup_tile = game_map.tiles[pickup_y][pickup_x]
-            is_pickup_building = game_map.legend.get(pickup_tile, {}).get("blocked", False)
-            
-            # Verificar si el pedido NO está en el inventario y se puede recoger
-            order_in_inventory = self.inventory.find_by_id(order.id) is not None
-            order_completed = hasattr(self, 'completed_orders') and self.completed_orders.find_by_id(order.id) is not None
-            
-            if not order_in_inventory and not order_completed:
-                # Para TODOS los tipos de ubicación, usar el radio especificado
                 can_pickup = self.is_near_location(order.pickup, include_exact=True, radius=radius)
                 
                 if can_pickup:
-                    distance = abs(self.grid_x - order.pickup[0]) + abs(self.grid_y - order.pickup[1])
+                    distance = max(abs(self.grid_x - order.pickup[0]), 
+                                abs(self.grid_y - order.pickup[1]))
                     interactable.append({
                         'order': order,
                         'action': 'pickup',
                         'location': order.pickup,
                         'is_exact': self.is_at_location(order.pickup),
                         'distance': distance,
-                        'is_building': is_pickup_building
+                        'is_building': self.is_building_location(order.pickup, game_map)
                     })
         
-        # 2. NUEVO: Ahora verificar pedidos para ENTREGAR (del inventario del jugador)
+        # Pedidos para ENTREGAR
         for order in self.inventory:
-            # Verificar que las coordenadas de entrega estén dentro del mapa
-            dropoff_x, dropoff_y = order.dropoff
-            if not (0 <= dropoff_y < len(game_map.tiles) and 0 <= dropoff_x < len(game_map.tiles[0])):
-                continue
+            if not order.is_completed:
+                if order.check_expiration(current_time):
+                    continue
                 
-            # Determinar si el dropoff es en un edificio
-            dropoff_tile = game_map.tiles[dropoff_y][dropoff_x]
-            is_dropoff_building = game_map.legend.get(dropoff_tile, {}).get("blocked", False)
-            
-            # Verificar si está cerca del punto de entrega
-            can_dropoff = self.is_near_location(order.dropoff, include_exact=True, radius=radius)
-            
-            if can_dropoff:
-                distance = abs(self.grid_x - order.dropoff[0]) + abs(self.grid_y - order.dropoff[1])
-                interactable.append({
-                    'order': order,
-                    'action': 'dropoff',
-                    'location': order.dropoff,
-                    'is_exact': self.is_at_location(order.dropoff),
-                    'distance': distance,
-                    'is_building': is_dropoff_building
-                })
+                can_dropoff = self.is_near_location(order.dropoff, include_exact=True, radius=radius)
+                
+                if can_dropoff:
+                    distance = max(abs(self.grid_x - order.dropoff[0]), 
+                                abs(self.grid_y - order.dropoff[1]))
+                    interactable.append({
+                        'order': order,
+                        'action': 'dropoff',
+                        'location': order.dropoff,
+                        'is_exact': self.is_at_location(order.dropoff),
+                        'distance': distance,
+                        'is_building': self.is_building_location(order.dropoff, game_map)
+                    })
         
-        # Priorizar interacciones exactas sobre adyacentes
         interactable.sort(key=lambda x: (not x['is_exact'], x['distance']))
         return interactable
+
+    def is_building_location(self, location, game_map):
+        x, y = location
+        if 0 <= y < len(game_map.tiles) and 0 <= x < len(game_map.tiles[0]):
+            tile_char = game_map.tiles[y][x]
+            return game_map.legend.get(tile_char, {}).get("blocked", False)
+        return False
         
     def get_position(self):
-        """Retorna la posición actual del jugador en el grid"""
         return (self.grid_x, self.grid_y)
     
     def get_visual_position(self):
-        """Retorna la posición visual para el rendering"""
-        return (self.visual_x, self.visual_y)
+        return (self.grid_x, self.grid_y)
     
-    # Métodos del inventario (sin cambios)
     def add_to_inventory(self, order: Order) -> bool:
-        """Añade un pedido al inventario y actualiza el peso - CON DEBUG MEJORADO"""
         print(f"DEBUG: Intentando añadir {order.id} (peso: {order.weight}kg)")
         print(f"DEBUG: Peso actual: {self.current_weight}kg, Capacidad máxima: {self.max_weight}kg")
         
@@ -372,28 +390,22 @@ class Player:
             self.inventory.enqueue(order)
             self.current_weight += order.weight
             print(f"DEBUG: ✅ {order.id} añadido. Nuevo peso: {self.current_weight}kg")
-            print(f"DEBUG: Inventario actual: {[order.id for order in self.inventory]}")
             return True
         else:
             print(f"DEBUG: ❌ No se puede añadir {order.id}. Peso necesario: {order.weight}kg, Espacio disponible: {self.max_weight - self.current_weight}kg")
             return False
     
     def remove_from_inventory(self, order_id: str) -> bool:
-        """Elimina un pedido del inventario por ID y actualiza el peso - CON DEBUG MEJORADO"""
         print(f"DEBUG: Intentando remover {order_id}")
         print(f"DEBUG: Peso antes de remover: {self.current_weight}kg")
-        print(f"DEBUG: Inventario antes: {[order.id for order in self.inventory]}")
         
         order = self.inventory.find_by_id(order_id)
         if order:
-            # PRIMERO remover el pedido del inventario
             removed = self.inventory.remove_by_id(order_id)
             if removed:
-                # SOLO si se removió correctamente, actualizar el peso
                 self.current_weight -= order.weight
                 print(f"DEBUG: ✅ {order_id} removido. Peso reducido en {order.weight}kg")
                 print(f"DEBUG: Peso después de remover: {self.current_weight}kg")
-                print(f"DEBUG: Inventario después: {[order.id for order in self.inventory]}")
                 return True
             else:
                 print(f"ERROR: No se pudo remover {order_id} del inventario")
@@ -403,11 +415,9 @@ class Player:
             return False
   
     def verify_weight_consistency(self):
-        """Verifica que el peso actual coincida con el inventario"""
         calculated_weight = sum(order.weight for order in self.inventory)
         if self.current_weight != calculated_weight:
             print(f"ERROR: Inconsistencia de peso! Actual: {self.current_weight}, Calculado: {calculated_weight}")
-            # Corregir automáticamente
             self.current_weight = calculated_weight
             print(f"Peso corregido a: {self.current_weight}kg")
         return self.current_weight == calculated_weight
@@ -416,7 +426,6 @@ class Player:
         return self.current_weight + order.weight <= self.max_weight
     
     def get_nearby_orders(self, orders, max_distance=1):
-        """MEJORADO: Usa distancia Manhattan para órdenes cercanas"""
         nearby_orders = []
         for order in orders:
             pickup_dist = abs(self.grid_x - order.pickup[0]) + abs(self.grid_y - order.pickup[1])
@@ -428,20 +437,27 @@ class Player:
         return nearby_orders
     
     def draw(self, screen, camera_x=0, camera_y=0):
-        """Dibuja al jugador usando la posición visual"""
         sprite = self.sprite_sheet[self.direction][self.current_frame]
         
-        screen_x = (self.visual_x - camera_x) * self.tile_size
-        screen_y = (self.visual_y - camera_y) * self.tile_size
+        screen_x = (self.grid_x - camera_x) * self.tile_size
+        screen_y = (self.grid_y - camera_y) * self.tile_size
         
         screen.blit(sprite, (screen_x, screen_y))
         
-        # Barra de stamina
+        # Barra de stamina con color según estado
         bar_width = 20 * self.scale_factor
         bar_height = 3 * self.scale_factor
+        
+        # Color de la barra según estado
+        if self.state == "exhausted":
+            color = (255, 0, 0)  # Rojo
+        elif self.state == "tired":
+            color = (255, 165, 0)  # Naranja
+        else:
+            color = (0, 255, 0)  # Verde
         
         pygame.draw.rect(screen, (100, 100, 100), 
                         (screen_x, screen_y - 10, bar_width, bar_height))
         
-        pygame.draw.rect(screen, (0, 255, 0), 
+        pygame.draw.rect(screen, color, 
                         (screen_x, screen_y - 10, bar_width * (self.stamina / 100), bar_height))

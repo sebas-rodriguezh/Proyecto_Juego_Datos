@@ -41,7 +41,7 @@ class Speed_Movement:
         """Cambia el estado de resistencia del jugador"""
         if estado in self.multiplicadores_resistencia:
             self.estado_resistencia = estado
-            print(f"Estado resistencia cambiado a: {estado}")  # DEBUG
+            #print(f"Estado resistencia cambiado a: {estado}")  # DEBUG
         else:
             print(f"ERROR: Estado de resistencia no válido: '{estado}'")  # DEBUG
             print(f"Estados válidos: {list(self.multiplicadores_resistencia.keys())}")  # DEBUG

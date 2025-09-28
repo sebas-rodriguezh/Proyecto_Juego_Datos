@@ -1,5 +1,6 @@
+# Order.py - VERSIÓN CORREGIDA PARA FECHAS CONSISTENTES
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 @dataclass
@@ -12,17 +13,193 @@ class Order:
     weight: int
     priority: int
     release_time: int
-    color: tuple = field(default_factory=lambda: (100, 100, 255)) 
+    color: tuple = field(default_factory=lambda: (100, 100, 255))
+    
+    # Campos para gestión de estados
+    is_expired: bool = field(default=False, init=False)
+    is_completed: bool = field(default=False, init=False)
+    is_in_inventory: bool = field(default=False, init=False)
+    accepted_time: datetime = field(default=None, init=False)
 
     @classmethod
     def from_dict(cls, data: dict):
+        deadline_str = data['deadline']
+        if len(deadline_str) == 16:
+            deadline_str += ":00"
+        
         return cls(
             id=data['id'],
             pickup=data['pickup'],
             dropoff=data['dropoff'],
             payout=data['payout'],
-            deadline=datetime.fromisoformat(data['deadline']),
+            deadline=datetime.fromisoformat(deadline_str),
             weight=data['weight'],
             priority=data['priority'],
             release_time=data['release_time']
         )
+    
+    def _normalize_times_for_comparison(self, current_time):
+        """NUEVO: Normaliza fechas para comparación consistente"""
+        # Usar el mismo día para ambas fechas
+        game_day = current_time.date()
+        
+        # Normalizar deadline al día del juego pero mantener la hora original
+        normalized_deadline = self.deadline.replace(
+            year=game_day.year,
+            month=game_day.month,
+            day=game_day.day
+        )
+        
+        return current_time, normalized_deadline
+    
+    def check_expiration(self, current_time: datetime) -> bool:
+        """Verifica si el pedido ha expirado - VERSIÓN CORREGIDA"""
+        if self.is_completed or self.is_expired:
+            return self.is_expired
+        
+        # Normalizar fechas para comparación
+        normalized_current, normalized_deadline = self._normalize_times_for_comparison(current_time)
+        
+        # Expirar EXACTAMENTE en el deadline o después
+        if normalized_current >= normalized_deadline:
+            self.is_expired = True
+            print(f"⏰ Pedido {self.id} EXPIRÓ")
+            print(f"   Deadline: {normalized_deadline.strftime('%H:%M:%S')}")
+            print(f"   Hora actual: {normalized_current.strftime('%H:%M:%S')}")
+            return True
+        
+        return False
+    
+    def get_time_remaining(self, current_time: datetime) -> float:
+        """Retorna el tiempo restante en segundos"""
+        if self.is_expired or self.is_completed:
+            return 0
+        
+        # Normalizar fechas
+        normalized_current, normalized_deadline = self._normalize_times_for_comparison(current_time)
+        
+        delta = normalized_deadline - normalized_current
+        remaining_seconds = delta.total_seconds()
+        
+        return max(0, remaining_seconds)  # Nunca negativo
+    
+    def get_delivery_timeliness(self, current_time: datetime) -> str:
+        """Determina la puntualidad de la entrega - VERSIÓN MEJORADA"""
+        if self.is_completed:
+            return "completed"
+        if self.is_expired:
+            return "expired"
+        
+        time_remaining = self.get_time_remaining(current_time)
+        
+        # Calcular porcentaje de tiempo usado basado en tiempo total disponible
+        if self.accepted_time:
+            # Usar tiempo desde que se aceptó el pedido
+            normalized_current, _ = self._normalize_times_for_comparison(current_time)
+            normalized_accepted = self.accepted_time.replace(
+                year=normalized_current.year,
+                month=normalized_current.month,
+                day=normalized_current.day
+            )
+            total_available_time = (self.deadline.replace(
+                year=normalized_current.year,
+                month=normalized_current.month,
+                day=normalized_current.day
+            ) - normalized_accepted).total_seconds()
+            
+            if total_available_time > 0:
+                time_used = total_available_time - time_remaining
+                percentage_used = (time_used / total_available_time) * 100
+            else:
+                percentage_used = 100
+        else:
+            # Usar tiempo estimado por defecto
+            total_available_time = 900  # 15 minutos
+            time_used = total_available_time - time_remaining
+            percentage_used = (time_used / total_available_time) * 100
+        
+        # Categorizar según especificaciones del proyecto
+        if percentage_used <= 50:  # Usó ≤50% del tiempo → Temprana
+            return "early"
+        elif time_remaining > 120:  # Más de 2 minutos restantes → A tiempo
+            return "on_time"
+        elif time_remaining > 30:   # 31-120 segundos → Tarde leve
+            return "late_120"
+        elif time_remaining > 0:    # 1-30 segundos → Tarde severa
+            return "late_30"
+        else:                       # 0 segundos o menos → Muy tarde
+            return "very_late"
+    
+    def calculate_reputation_change(self, current_time: datetime) -> int:
+        """Calcula el cambio de reputación según especificaciones del proyecto"""
+        timeliness = self.get_delivery_timeliness(current_time)
+        time_remaining = self.get_time_remaining(current_time)
+        
+        print(f"🔍 REPUTACIÓN {self.id}: {timeliness}, {time_remaining:.0f}s restantes")
+        
+        if timeliness == "early":
+            print("   +5 reputación (entrega temprana)")
+            return 5
+        elif timeliness == "on_time":
+            print("   +3 reputación (a tiempo)")
+            return 3
+        elif timeliness == "late_120":
+            print("   -5 reputación (31-120s tarde)")
+            return -5
+        elif timeliness == "late_30":
+            print("   -2 reputación (1-30s tarde)")
+            return -2
+        elif timeliness == "very_late":
+            print("   -10 reputación (>120s tarde)")
+            return -10
+        
+        return 0
+    
+    def get_urgency_color(self, current_time: datetime) -> tuple:
+        """Retorna color según urgencia del pedido"""
+        if self.is_completed:
+            return (100, 100, 100)  # Gris - completado
+        if self.is_expired:
+            return (50, 50, 50)     # Gris oscuro - expirado
+        
+        time_remaining = self.get_time_remaining(current_time)
+        
+        # Colores según tiempo restante
+        if time_remaining <= 30:           # ≤30 segundos
+            return (255, 0, 0)             # Rojo - crítico
+        elif time_remaining <= 120:        # 31-120 segundos  
+            return (255, 165, 0)           # Naranja - urgente
+        elif time_remaining <= 300:        # 2-5 minutos
+            return (255, 255, 0)           # Amarillo - atención
+        else:                              # >5 minutos
+            return (0, 200, 0)             # Verde - tranquilo
+    
+    def calculate_payout_modifier(self, current_time: datetime, player_reputation: int) -> float:
+        """Calcula modificadores de pago según especificaciones"""
+        modifier = 1.0
+        timeliness = self.get_delivery_timeliness(current_time)
+        
+        # Penalización por entrega tardía según especificaciones del proyecto
+        if timeliness == "late_30":
+            modifier *= 0.95   # -5% por tardanza leve
+        elif timeliness == "late_120":
+            modifier *= 0.90   # -10% por tardanza moderada
+        elif timeliness == "very_late":
+            modifier *= 0.80   # -20% por tardanza severa
+        
+        # Bonus por reputación alta (≥90)
+        if player_reputation >= 90:
+            modifier *= 1.05  # +5% bonus
+        
+        return modifier
+    
+    # Métodos existentes se mantienen igual
+    def mark_as_accepted(self, acceptance_time: datetime):
+        self.accepted_time = acceptance_time
+    
+    def mark_as_completed(self):
+        self.is_completed = True
+        self.is_in_inventory = False
+    
+    def mark_as_picked_up(self):
+        self.is_in_inventory = True
