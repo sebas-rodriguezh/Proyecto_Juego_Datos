@@ -252,50 +252,45 @@ class GameEngine:
         print(f"⏰ Deadline: {order.deadline.strftime('%H:%M:%S')}, Hora actual: {current_time.strftime('%H:%M:%S')}")
 
     def get_game_start_time_from_json(self):
-        """Extrae la hora ABSOLUTA de inicio del JSON - CORREGIDO"""
+        """Extrae la hora de inicio desde map_data - VERSIÓN ACTUALIZADA"""
         try:
-            # Opción 1: Buscar en jobs_data y usar la fecha del primer pedido
-            if self.jobs_data and len(self.jobs_data) > 0:
-                first_job = self.jobs_data['data'][0]  # Acceder a la lista de datos
+            # ✅ PRIORIDAD 1: Usar start_time del mapa si existe
+            if "start_time" in self.map_data.get("data", {}):
+                start_time_str = self.map_data["data"]["start_time"]
+                
+                # Remover Z si existe
+                if start_time_str.endswith('Z'):
+                    start_time_str = start_time_str[:-1]
+                
+                start_time = datetime.fromisoformat(start_time_str)
+                print(f"🕕 Hora de inicio desde map_data: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                return start_time
+            
+            # FALLBACK: Buscar en el primer pedido
+            if self.jobs_data and len(self.jobs_data.get('data', [])) > 0:
+                first_job = self.jobs_data['data'][0]
                 if "deadline" in first_job:
                     deadline_str = first_job["deadline"]
                     
-                    # Completar formato si es necesario
-                    if len(deadline_str) == 16:  # "2025-09-01T12:10"
+                    # Manejar Z
+                    if deadline_str.endswith('Z'):
+                        deadline_str = deadline_str[:-1]
+                    
+                    if len(deadline_str) == 16:
                         deadline_str += ":00"
                     
-                    # Parsear la fecha del pedido
-                    deadline = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
-                    
-                    # Usar 1 hora antes del primer deadline como inicio
+                    deadline = datetime.fromisoformat(deadline_str)
                     start_time = deadline - timedelta(hours=0.2)
-                    print(f"🕐 Hora calculada desde JSON: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f"🕕 Hora calculada desde deadline: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     return start_time
                         
         except Exception as e:
             print(f"⚠️ Error leyendo hora del JSON: {e}")
         
-        # Fallback: usar la fecha de LOS PEDIDOS pero hora actual del día
-        try:
-            if self.jobs_data and len(self.jobs_data) > 0:
-                first_job = self.jobs_data['data'][0]
-                deadline_str = first_job["deadline"]
-                if len(deadline_str) == 16:
-                    deadline_str += ":00"
-                
-                # Obtener la fecha del pedido pero con hora de inicio razonable (ej: 8:00 AM)
-                deadline_date = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
-                start_time = deadline_date.replace(hour=8, minute=0, second=0, microsecond=0)
-                print(f"🕐 Hora fallback desde pedidos: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                return start_time
-        except:
-            pass
-        
-        # Último fallback: fecha actual a las 8:00 AM
+        # Último fallback
         default_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
-        print(f"🕐 Usando hora por defecto: {default_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"🕕 Usando hora por defecto: {default_time.strftime('%Y-%m-%d %H:%M:%S')}")
         return default_time
-
 
     def load_from_save_data(self, save_data):
         """Carga el estado del juego desde datos guardados - VERSIÓN COMPLETA MEJORADA"""

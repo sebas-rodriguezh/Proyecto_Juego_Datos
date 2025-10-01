@@ -275,7 +275,7 @@ class UIManager:
     #         self.screen.blit(no_items, (x_offset + 15, 235))
 
     def draw_inventory(self, cols, player, game_time=None):
-        """Dibuja el inventario mostrando tiempo restante - CON TIEMPO DEL JUEGO"""
+        """Dibuja el inventario mostrando colores originales y tiempo restante"""
         x_offset = cols * self.game_map.tile_size
         
         inventory_title = self.font_medium.render("Inventario:", True, (0, 0, 0))
@@ -285,43 +285,50 @@ class UIManager:
             for i, order in enumerate(player.inventory):
                 y_pos = 235 + i * 45
                 
-                # Obtener tiempo actual del juego
+                # ✅ Usar el color original del pedido
+                bg_color = order.color
+                
+                # Ajustar el color de fondo para que sea más claro (mejor contraste con texto)
+                light_bg_color = (
+                    min(255, bg_color[0] + 50),
+                    min(255, bg_color[1] + 50), 
+                    min(255, bg_color[2] + 50)
+                )
+                
+                # ✅ CALCULAR TIEMPO RESTANTE (se mantiene esta funcionalidad)
                 if game_time:
                     current_time = game_time.get_current_game_time()
+                    time_remaining = order.get_time_remaining(current_time)
+                    minutes = int(time_remaining // 60)
+                    seconds = int(time_remaining % 60)
+                    time_text = f"{minutes:02d}:{seconds:02d}"
                 else:
-                    from datetime import datetime
-                    current_time = datetime.now()
+                    time_text = order.deadline.strftime('%H:%M')
                 
-                # Calcular tiempo restante
-                time_remaining = order.get_time_remaining(current_time)
-                
-                # Color de fondo basado en urgencia
-                if time_remaining < 60:  # Menos de 1 minuto
-                    bg_color = (255, 200, 200)  # Rojo claro - urgente
-                elif time_remaining < 300:  # Menos de 5 minutos
-                    bg_color = (255, 255, 200)  # Amarillo - atención
+                # Determinar color de borde basado en prioridad
+                if order.priority > 0:
+                    border_color = (200, 0, 0)   # Rojo para prioritarios
+                    priority_icon = "🚨 "  # Icono de alerta
                 else:
-                    bg_color = (200, 255, 200)  # Verde - tranquilo
+                    border_color = (0, 150, 0)   # Verde para normales
+                    priority_icon = ""           # Sin icono
                 
-                # Información de tiempo restante
-                minutes = int(time_remaining // 60)
-                seconds = int(time_remaining % 60)
-                time_text = f"{minutes:02d}:{seconds:02d}"
+                # Dibujar caja de inventario
+                pygame.draw.rect(self.screen, light_bg_color, (x_offset + 10, y_pos, 280, 40))
+                pygame.draw.rect(self.screen, border_color, (x_offset + 10, y_pos, 280, 40), 2)
                 
-                # Dibujar caja
-                pygame.draw.rect(self.screen, bg_color, (x_offset + 10, y_pos, 280, 40))
+                # Información del pedido CON TIEMPO RESTANTE
+                order_text = f"{priority_icon}{order.id} | {time_text}"
+                order_surface = self.font_small.render(order_text, True, (0, 0, 0))
+                self.screen.blit(order_surface, (x_offset + 15, y_pos + 5))
                 
-                # Información del pedido
-                order_id = self.font_small.render(f"{order.id} | {time_text}", True, (0, 0, 0))
-                self.screen.blit(order_id, (x_offset + 15, y_pos + 5))
-                
-                details = f"P:{order.priority} | ${order.payout} | {order.weight}kg"
-                details_surface = self.font_small.render(details, True, (80, 80, 80))
-                self.screen.blit(details_surface, (x_offset + 15, y_pos + 20))
+                # Información adicional
+                info_text = f"P:{order.priority} | ${order.payout} | {order.weight}kg"
+                info_surface = self.font_small.render(info_text, True, (80, 80, 80))
+                self.screen.blit(info_surface, (x_offset + 15, y_pos + 20))
         else:
             no_items = self.font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
             self.screen.blit(no_items, (x_offset + 15, 235))
-
 
     def draw_weather_info(self, cols, weather_system, player):
         """Dibuja información del clima"""
@@ -481,9 +488,7 @@ class UIManager:
 
     # ui_manager.py - CORREGIR método draw_interaction_hints
     def draw_interaction_hints(self, player, active_orders, camera_x, camera_y, game_map=None):
-        """Dibuja pistas de interacción cerca del jugador (CON RADIO AMPLIADO) - CORREGIDO"""
-        # CORRECCIÓN: Pasar game_map al método get_interactable_orders
-
+        """Dibuja pistas de interacción cerca del jugador - SIMPLIFICADO"""
         if hasattr(self, 'interaction_manager') and hasattr(self.interaction_manager, 'game_time'):
             game_time = self.interaction_manager.game_time
         else:
@@ -497,47 +502,48 @@ class UIManager:
             interaction = interactable_orders[0]
             order_info = interaction['order']
             action = interaction['action']
-            is_exact = interaction['is_exact']
-            distance = interaction['distance']
-            is_building = interaction.get('is_building', False)
             
+            # ✅ TEXTO SIMPLE: Solo "Recoger/Entregar + ID"
             if action == 'pickup':
                 hint_text = f"Recoger {order_info.id}"
-                hint_color = (0, 255, 0)  # Verde
-                icon = "📦"
             else:  # dropoff
                 hint_text = f"Entregar {order_info.id}"
-                hint_color = (255, 255, 0)  # Amarillo
-                icon = "📤"
-            
-            # Añadir información de distancia
-            if is_building and not is_exact:
-                hint_text += " (desde afuera)"
-            elif not is_exact:
-                hint_text += f" ({distance} casillas)"
-            else:
-                hint_text += " (exacto)"
             
             # Usar la posición del punto de interacción
             loc_x, loc_y = interaction['location']
             
-            hint_text_surface = self.font_small.render(f"{icon} {hint_text}", True, (255, 255, 255))
+            # ✅ FUENTE MÁS GRANDE Y LEGIBLE
+            hint_text_surface = self.font_medium.render(hint_text, True, (0, 0, 0))  # Texto negro
             text_width = hint_text_surface.get_width()
+            text_height = hint_text_surface.get_height()
             
+            # Tamaño compacto
+            padding = 6
             hint_bg = pygame.Rect(
-                loc_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x - text_width // 2,
+                loc_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x - text_width // 2 - padding,
                 loc_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y - 30,
-                text_width + 10, 20
+                text_width + padding * 2,
+                text_height + padding * 2
             )
             
-            # Fondo semitransparente
-            pygame.draw.rect(self.screen, (*hint_color, 180), hint_bg, border_radius=5)
-            pygame.draw.rect(self.screen, (255, 255, 255), hint_bg, 2, border_radius=5)
+            # Color del pedido (fondo más claro para mejor contraste)
+            hint_color = order_info.color
+            light_bg_color = (
+                min(255, hint_color[0] + 80),
+                min(255, hint_color[1] + 80),
+                min(255, hint_color[2] + 80)
+            )
             
+            # Dibujar fondo con color del pedido
+            pygame.draw.rect(self.screen, light_bg_color, hint_bg, border_radius=5)
+            # Borde del color original
+            pygame.draw.rect(self.screen, hint_color, hint_bg, 2, border_radius=5)
+            
+            # Dibujar texto centrado
             self.screen.blit(
                 hint_text_surface,
-                (loc_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x - text_width // 2 + 5,
-                loc_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y - 27)
+                (loc_x * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_x - text_width // 2,
+                loc_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y - 30 + padding)
             )
     
     def draw_game_over_screen(self, game_state):

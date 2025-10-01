@@ -24,6 +24,12 @@ class Order:
     @classmethod
     def from_dict(cls, data: dict):
         deadline_str = data['deadline']
+        
+        # ✅ NUEVO: Manejar formato con Z (UTC)
+        if deadline_str.endswith('Z'):
+            deadline_str = deadline_str[:-1]  # Remover la Z
+        
+        # Completar formato si es necesario
         if len(deadline_str) == 16:
             deadline_str += ":00"
         

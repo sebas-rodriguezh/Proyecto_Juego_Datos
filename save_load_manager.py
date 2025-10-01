@@ -163,21 +163,25 @@ class SaveLoadManager:
             }
     
     def _serialize_order_list(self, order_list):
-        """Serializa una OrderList - MEJORADO CON ESTADOS COMPLETOS"""
+        """Serializa una OrderList - VERSIÓN COMPATIBLE CON Z"""
         orders_data = []
         try:
             for order in order_list:
+                # Convertir deadline a string sin Z
+                deadline_str = order.deadline.isoformat()
+                if not deadline_str.endswith('Z'):
+                    deadline_str = deadline_str  # Ya está bien
+                
                 order_data = {
                     "id": order.id,
                     "pickup": order.pickup,
                     "dropoff": order.dropoff,
                     "payout": order.payout,
-                    "deadline": order.deadline.isoformat() if hasattr(order.deadline, 'isoformat') else str(order.deadline),
+                    "deadline": deadline_str,  # Sin Z para compatibilidad interna
                     "weight": order.weight,
                     "priority": order.priority,
                     "release_time": order.release_time,
                     "color": list(order.color) if hasattr(order, 'color') else [100, 100, 255],
-                    # ✅ ESTADOS COMPLETOS de la orden
                     "is_expired": getattr(order, 'is_expired', False),
                     "is_completed": getattr(order, 'is_completed', False),
                     "is_in_inventory": getattr(order, 'is_in_inventory', False),
