@@ -59,5 +59,5 @@ if __name__ == "__main__":
 
 
     # Crear y ejecutar el mapa
-    game_map = Map(api.get_map_data(), tile_size=20)
+    game_map = Map(api.get_map_data(), tile_size=16)
     game_map.run()

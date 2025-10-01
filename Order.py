@@ -52,6 +52,8 @@ class Order:
         
         return current_time, normalized_deadline
     
+    
+    
     def check_expiration(self, current_time: datetime) -> bool:
         """Verifica si el pedido ha expirado - VERSIÓN CORREGIDA"""
         if self.is_completed or self.is_expired:

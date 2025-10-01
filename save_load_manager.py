@@ -25,6 +25,7 @@ class SaveLoadManager:
                 "active_orders": self._serialize_order_list(game_engine.active_orders),
                 "completed_orders": self._serialize_order_list(game_engine.completed_orders),
                 "pending_orders": self._serialize_order_list(game_engine.pending_orders),
+                "rejected_orders": self._serialize_order_list(game_engine.rejected_orders), 
                 "game_state": self._serialize_game_state(game_engine.game_state),
                 "game_time": self._serialize_game_time(game_engine.game_time),
                 "weather_state": self._serialize_weather(game_engine.weather_system),

@@ -132,6 +132,7 @@ class GameEngine:
         self.active_orders = OrderList.create_empty()  # Pedidos activos (liberados)
         self.pending_orders = OrderList.create_empty()  # Pedidos pendientes de liberar
         self.completed_orders = OrderList.create_empty()
+        self.rejected_orders = OrderList.create_empty()  # NUEVO: Pedidos rechazados
 
         # DEBUG: Verificar release_time de los pedidos
         print("🔍 DEBUG RELEASE_TIMES:")
@@ -301,6 +302,7 @@ class GameEngine:
                 self.active_orders = OrderList.create_empty()
                 self.completed_orders = OrderList.create_empty()
                 self.pending_orders = OrderList.create_empty()
+                self.rejected_orders = OrderList.create_empty()  # NUEVO: Pedidos rechazados
                 
                 # Cargar estado del jugador
                 player_data = save_data["player_data"]
@@ -352,6 +354,14 @@ class GameEngine:
                         self.completed_orders.enqueue(order)
                     except Exception as e:
                         print(f"⚠️ Error cargando orden completada global: {e}")
+                        
+                if "rejected_orders" in save_data:
+                    for order_data in save_data["rejected_orders"]:
+                        try:
+                            order = self._create_order_from_save_data(order_data)
+                            self.rejected_orders.enqueue(order)
+                        except Exception as e:
+                            print(f"⚠️ Error cargando orden rechazada: {e}")
                 
                 # ✅ CARGAR ÓRDENES PENDIENTES
                 if "pending_orders" in save_data:
@@ -556,9 +566,11 @@ class GameEngine:
         # NUEVO: Dar acceso al interaction_manager desde ui_manager
         self.ui_manager.interaction_manager = self.interaction_manager
         
+        # NUEVO: Dar acceso a game_engine desde popup_manager
+        self.popup_manager.game_engine = self
+        
         # Variables de cámara
         self.camera_x, self.camera_y = 0, 0
-    
     # game_engine.py - CORRECCIÓN para pasar game_map al interaction manager
     def handle_events(self):
         """Maneja todos los eventos del juego"""
@@ -566,7 +578,8 @@ class GameEngine:
             if event.type == pygame.QUIT:
                 self.running = False
             
-            popup_result = self.popup_manager.handle_event(event, self.game_state, self.player, self.active_orders)
+            popup_result = self.popup_manager.handle_event(event, self, self.player, self.active_orders)
+
 
             if popup_result:
                 message = popup_result.get("message", "")
@@ -728,26 +741,73 @@ class GameEngine:
         self.camera_y = max(0, min(self.camera_y, self.rows * self.game_map.tile_size - self.screen_height))
     
     def update_game_state(self):
-        """Actualiza el estado general del juego"""
+        """Actualiza el estado general del juego - VERSIÓN MEJORADA"""
+        # Si el juego ya terminó, no hacer nada
+        if self.game_state.game_over:
+            return
+        
         # Verificar condiciones de victoria/derrota
-        if self.player.reputation < 20 and not self.game_state.game_over:
+        if self.player.reputation < 20:
             print("🎮 Fin del juego: Reputación muy baja")
             self.game_state.set_game_over(False, "Derrota: Reputación muy baja")
             self.save_final_score(False)
-        elif self.game_time.is_time_up() and self.game_state.total_earnings < self.income_goal and not self.game_state.game_over:
+            return
+        
+        if self.game_time.is_time_up() and self.game_state.total_earnings < self.income_goal:
             print("🎮 Fin del juego: Tiempo agotado")
             self.game_state.set_game_over(False, "Derrota: Tiempo agotado")
             self.save_final_score(False)
-        elif self.game_state.total_earnings >= self.income_goal and not self.game_state.game_over:
+            return
+        
+        if self.game_state.total_earnings >= self.income_goal:
             print("🎮 Fin del juego: Victoria alcanzada")
             self.game_state.set_game_over(True, "¡Victoria! Meta alcanzada")
             self.save_final_score(True)
-        elif self.game_state.total_earnings <= self.income_goal and self.pending_orders.is_empty()==True and self.active_orders.is_empty()==True and len(self.player.inventory) == 0 and not self.game_state.game_over:
-            print("🎮 Fin del juego: No quedan pedidos y no se alcanzó la meta")
-            self.game_state.set_game_over(False, "Derrota: No quedan pedidos y no se alcanzó la meta")
+            return
+        
+        # NUEVA CONDICIÓN: Verificar si no quedan pedidos disponibles
+        if self.no_more_available_orders():
+            print("🎮 Fin del juego: No quedan pedidos disponibles")
+            self.game_state.set_game_over(False, "Derrota: No quedan pedidos disponibles")
             self.save_final_score(False)
-
-
+            return
+    def no_more_available_orders(self):
+        """Verifica si no quedan pedidos disponibles para completar - VERSIÓN CORREGIDA"""
+        
+        # DEBUG: Mostrar estado actual
+        print("🔍 VERIFICANDO ESTADO DE PEDIDOS:")
+        print(f"   Total pedidos: {len(self.all_orders)}")
+        print(f"   Activos: {len(self.active_orders)}")
+        print(f"   Pendientes: {len(self.pending_orders)}")
+        print(f"   Completados: {len(self.completed_orders)}")
+        print(f"   Rechazados: {len(self.rejected_orders)}")
+        print(f"   En inventario: {len(self.player.inventory)}")
+        
+        # Verificar si no hay pedidos activos, pendientes o en inventario
+        no_active_orders = (
+            len(self.active_orders) == 0 and 
+            len(self.pending_orders) == 0 and 
+            len(self.player.inventory) == 0
+        )
+        
+        if not no_active_orders:
+            print("   ⚠️  Aún hay pedidos disponibles")
+            return False
+        
+        # Calcular total de pedidos procesados (completados + rechazados)
+        total_processed = len(self.completed_orders) + len(self.rejected_orders)
+        
+        # Verificar si hemos procesado todos los pedidos del juego
+        all_orders_processed = (total_processed >= len(self.all_orders))
+        
+        print(f"   Procesados: {total_processed}/{len(self.all_orders)}")
+        
+        if all_orders_processed:
+            print("   ✅ Todos los pedidos han sido procesados")
+        else:
+            print(f"   ❌ Faltan {len(self.all_orders) - total_processed} pedidos por procesar")
+        
+        return all_orders_processed
     def save_final_score(self, victory: bool):
         """Guarda la puntuación final - VERSIÓN MEJORADA"""
         try:
