@@ -8,6 +8,7 @@ class OrderPopupManager:
         self.screen_width = screen_width
         self.screen_height = screen_height
         
+        self.game_engine = None  # Se establecerá después
         # Estado del popup de nuevo pedido
         self.pending_order = None  # Pedido esperando respuesta
         self.popup_timer = 0
@@ -171,12 +172,17 @@ class OrderPopupManager:
                 "message": f"No tienes capacidad para {order.id}"
             }
     
-    def reject_order(self, game_state):
+    def reject_order(self, game_engine):
         """Procesa el rechazo de un pedido"""
         if not self.pending_order:
             return None
         
         order = self.pending_order
+        
+        # AÑADIR: Añadir a la lista de pedidos rechazados del game_engine
+        if hasattr(game_engine, 'rejected_orders'):
+            game_engine.rejected_orders.enqueue(order)
+            print(f"📝 Pedido {order.id} añadido a rechazados. Total: {len(game_engine.rejected_orders)}")
         
         # Limpiar popup
         self.popup_active = False
@@ -190,7 +196,6 @@ class OrderPopupManager:
             "message": f"Pedido {order.id} rechazado (-1 reputación)",
             "penalty": 1  # Añadir penalización para aplicar después
         }
-    
     def confirm_cancel_order(self, game_state, player):
         """Confirma la cancelación de un pedido del inventario"""
         if not self.selected_order_for_cancel:
@@ -235,7 +240,8 @@ class OrderPopupManager:
             if self.popup_timer <= 0:
                 # Auto-rechazar si se acaba el tiempo
                 print(f"⏰ Tiempo agotado para {self.pending_order.id} - Auto-rechazando")
-                self.reject_order(None)  # Auto-rechazar
+                # CORREGIR: Pasar game_engine en lugar de None
+                self.reject_order(self.game_engine)  # Auto-rechazar
     
     def get_popup_position(self):
         """Calcula la posición del popup de nuevo pedido"""
