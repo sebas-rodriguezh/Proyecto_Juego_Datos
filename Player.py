@@ -104,13 +104,20 @@ class Player:
                                   self.target_size//3)
         return sprites
     
+   
     def try_move(self, dx, dy, tiles, weather_multiplier, surface_multiplier):
         """Intenta moverse a una nueva casilla con velocidad adecuada"""
         if self.move_cooldown > 0:
             return False
             
+        # ✅ CORRECCIÓN CRÍTICA: Verificar estado EXHAUSTED primero
         if self.state == "exhausted":
-            print("❌ No se puede mover: EXHAUSTED")
+            return False
+        
+        # ✅ También verificar si stamina es 0 (por si acaso)
+        if self.stamina <= 0:
+            print("❌ Stamina insuficiente para moverse (agotado)")
+            self.state = "exhausted"
             return False
         
         new_x = self.grid_x + dx
@@ -132,21 +139,24 @@ class Player:
         velocidad_final = self.speed_system.calcular_velocidad_final(surface_type)
         velocidad_final *= weather_multiplier
         
-       # print(f"🚴 Velocidad: {velocidad_final:.2f} | Estado: {self.state} | Stamina: {self.stamina:.1f}")
-        
         if velocidad_final <= 0:
             print("❌ Velocidad <= 0, no se puede mover")
             return False
         
-        # ✅ CORRECCIÓN: Calcular consumo ANTES de mover
+        # Calcular consumo ANTES de mover
         stamina_consumption = self.calculate_stamina_consumption(velocidad_final, weather_multiplier)
         
-        # Verificar si tiene suficiente stamina
-        if self.stamina - stamina_consumption < 0:
-            print("❌ Stamina insuficiente para moverse")
+        # ✅ CORRECCIÓN: Verificar si hay suficiente stamina para este movimiento
+        if self.stamina < stamina_consumption:
+            print(f"❌ Stamina insuficiente para moverse: {self.stamina:.1f} < {stamina_consumption:.1f}")
+            
+            # ✅ Si no hay suficiente, consumir lo que queda y cambiar a exhausted
+            if self.stamina > 0:
+                remaining_stamina = self.stamina
+                self.consume_stamina(remaining_stamina)  # Consumir stamina restante
             return False
         
-        # MOVIMIENTO INSTANTÁNEO
+        # MOVIMIENTO EXITOSO
         self.grid_x = new_x
         self.grid_y = new_y
         
@@ -160,19 +170,18 @@ class Player:
         elif dy < 0:
             self.direction = "up"
         
-        # ✅ CORRECCIÓN: Cooldown inversamente proporcional a la velocidad
+        # Cooldown inversamente proporcional a la velocidad
         base_cooldown = 0.5
         self.move_cooldown = base_cooldown / max(0.1, velocidad_final)
         self.move_cooldown = max(0.1, min(1.0, self.move_cooldown))
         
-        # ✅ CORRECCIÓN: Consumir stamina DESPUÉS de moverse exitosamente
+        # Consumir stamina DESPUÉS de moverse exitosamente
         self.consume_stamina(stamina_consumption)
         
         self.is_moving = True
         
         return True
-    
-    
+
     def calculate_stamina_consumption(self, velocidad_final, weather_multiplier):
         """Calcula el consumo de stamina POR CELDA movida"""
         # Consumo BASE por celda (según especificaciones del proyecto)
@@ -229,58 +238,77 @@ class Player:
             self.animation_time = 0
             self.current_frame = (self.current_frame + 1) % 4
     
+
     def consume_stamina(self, consumption):
-        """Consume stamina directamente (sin parámetro dt)"""
-        # print(f"=== CONSUMO STAMINA ===")
-        # print(f"Consumo: {consumption:.3f}")
-        # print(f"Stamina antes: {self.stamina:.1f}")
+        """Consume stamina y actualiza el estado correctamente"""
+        old_stamina = self.stamina
+        old_state = self.state
         
         self.stamina -= consumption
         
-        # Actualizar estado basado en stamina
-        if self.stamina <= 0:
-            self.state = "exhausted"
+        # ✅ CORRECCIÓN: Asegurar que no baje de 0
+        if self.stamina < 0:
             self.stamina = 0
-            print("¡¡¡EXHAUSTED!!! - Stamina agotada")
-        elif self.stamina <= 30:
-            if self.state != "tired" and self.state != "exhausted":
-                print("Estado cambiado a TIRED")
-            self.state = "tired"
-        # else:
-        #     if self.state != "normal" and self.state != "exhausted":
-        #         print("Estado cambiado a NORMAL")
-        #     self.state = "normal"
         
-        # print(f"Stamina después: {self.stamina:.1f}")
-        # print(f"Estado actual: {self.state}")
-        # print("======================")
+        # ✅ CORRECCIÓN PRINCIPAL: Actualizar estados de manera más estricta
+        if self.stamina <= 0:
+            new_state = "exhausted"
+            self.stamina = 0
+        elif self.stamina <= 30:
+            new_state = "tired"
+        else:
+            new_state = "normal"
+        
+        # Solo imprimir si el estado cambió
+        if new_state != old_state:
+            self.state = new_state
+            if new_state == "exhausted":
+                print("¡¡¡EXHAUSTED!!! - Stamina agotada - NO PUEDE MOVERSE")
+            elif new_state == "tired":
+                print("Estado TIRED - Se mueve más lento pero PUEDE MOVERSE")
+            elif new_state == "normal":
+                print("Estado NORMAL - Movimiento normal")
+
 
     def recover_stamina(self, dt, at_rest_point=False):
         """Recupera stamina cuando no se está moviendo"""
-        # ✅ CORRECCIÓN: Tasas de recuperación según especificaciones
+        # No recuperar si ya está al máximo
+        if self.stamina >= 100:
+            return
+        
         recovery_rate = 5.0  # +5 por segundo (base)
         if at_rest_point:
             recovery_rate = 10.0  # +10 por segundo en puntos de descanso
         
         recovery = recovery_rate * dt
-        
         old_stamina = self.stamina
+        old_state = self.state
+        
         self.stamina = min(100, self.stamina + recovery)
         
-        # Manejar transición de estado exhausted
-        if self.state == "exhausted" and self.stamina >= 30:
-            self.state = "normal"
-            print("✅ Recuperado de EXHAUSTED a NORMAL")
-        elif self.state != "exhausted":
-            # Actualizar estado normal/tired
+        # ✅ CORRECCIÓN CRÍTICA: Manejar correctamente la transición de exhausted
+        if old_state == "exhausted" and self.stamina >= 30:
+            self.state = "tired"
+            print(f"✅ Recuperado de EXHAUSTED a TIRED - Stamina: {self.stamina:.1f}/30 - Ahora PUEDE MOVERSE")
+        elif old_state == "exhausted" and self.stamina > 0:
+            # Seguir en exhausted hasta llegar a 30
+            if int(old_stamina) != int(self.stamina):  # Solo imprimir cuando cambie el número entero
+                #print(f"🔄 Recuperando de EXHAUSTED: {self.stamina:.1f}/30")
+                pass
+                
+        else:
+            # Actualizar estado normal/tired para otros casos
             if self.stamina <= 30:
-                self.state = "tired"
+                new_state = "tired"
             else:
-                self.state = "normal"
-        
-        # Debug de recuperación
-        # if recovery > 0 and abs(old_stamina - self.stamina) > 0.01:
-        #     print(f"💚 Recuperando stamina: +{recovery:.2f} (total: {self.stamina:.1f})")
+                new_state = "normal"
+            
+            if new_state != old_state:
+                self.state = new_state
+                if new_state == "tired":
+                    print("Estado TIRED - Se mueve más lento pero PUEDE MOVERSE")
+                elif new_state == "normal":
+                    print("Estado NORMAL - Movimiento normal")
 
     def reorganize_inventory_by_priority(self):
         if not self.inventory.is_empty():
