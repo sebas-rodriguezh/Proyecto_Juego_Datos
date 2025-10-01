@@ -48,25 +48,29 @@ class OrderPopupManager:
             self.cancel_popup_active = True
             print(f"⚠️ Mostrando popup de cancelación para: {order.id}")
     
-    def handle_event(self, event, game_state, player, active_orders):
-        """Maneja eventos relacionados con los popups"""
+    def handle_event(self, event, game_engine, player, active_orders):
+        """Maneja eventos relacionados con los popups - VERSIÓN CORREGIDA"""
         result = None
         
         if event.type == pygame.KEYDOWN:
+            # ✅ CORRECCIÓN: No procesar ESC aquí si está en popup, dejar que game_engine lo maneje
+            if event.key == pygame.K_ESCAPE:
+                # ESC se maneja en game_engine para evitar conflictos
+                return None
+                
             # Popup de nuevo pedido
             if self.popup_active and self.pending_order:
                 if event.key == pygame.K_y:  # Aceptar pedido
-                    result = self.accept_order(game_state, player, active_orders)
+                    result = self.accept_order(game_engine.game_state, player, active_orders)
                 elif event.key == pygame.K_n:  # Rechazar pedido
-                    result = self.reject_order(game_state)
-                elif event.key == pygame.K_ESCAPE:  # Auto-rechazar
-                    result = self.reject_order(game_state)
+                    result = self.reject_order(game_engine)  # Pasar game_engine completo
             
             # Popup de cancelación
             elif self.cancel_popup_active and self.selected_order_for_cancel:
                 if event.key == pygame.K_y:  # Confirmar cancelación
-                    result = self.confirm_cancel_order(game_state, player)
-                elif event.key == pygame.K_n or event.key == pygame.K_ESCAPE:  # No cancelar
+                    # ✅ CORRECCIÓN: Pasar game_state en lugar de game_engine
+                    result = self.confirm_cancel_order(game_engine.game_state, player)
+                elif event.key == pygame.K_n:  # No cancelar
                     self.cancel_popup_active = False
                     self.selected_order_for_cancel = None
         
@@ -75,18 +79,18 @@ class OrderPopupManager:
             
             # Clicks en popup de nuevo pedido
             if self.popup_active and self.pending_order:
-                popup_result = self.handle_popup_click(mouse_x, mouse_y, game_state, player, active_orders)
+                popup_result = self.handle_popup_click(mouse_x, mouse_y, game_engine.game_state, player, active_orders)
                 if popup_result:
                     result = popup_result
             
             # Clicks en popup de cancelación
             elif self.cancel_popup_active:
-                cancel_result = self.handle_cancel_popup_click(mouse_x, mouse_y, game_state, player)
+                # ✅ CORRECCIÓN: Pasar game_state en lugar de game_engine
+                cancel_result = self.handle_cancel_popup_click(mouse_x, mouse_y, game_engine.game_state, player)
                 if cancel_result:
                     result = cancel_result
         
         return result
-    
     def handle_popup_click(self, mouse_x, mouse_y, game_state, player, active_orders):
         """Maneja clicks en el popup de nuevo pedido"""
         popup_x, popup_y = self.get_popup_position()

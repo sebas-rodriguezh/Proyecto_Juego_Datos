@@ -1,6 +1,20 @@
 [
   {
     "player_name": "Jugador",
+    "score": 1281,
+    "earnings": 1115,
+    "orders_completed": 5,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": true,
+    "date": "2025-10-01T13:42:28.174817",
+    "game_duration": 225.84600000000003,
+    "final_reputation": 95
+  },
+  {
+    "player_name": "Jugador",
     "score": 1279,
     "earnings": 1113,
     "orders_completed": 5,
@@ -25,6 +39,34 @@
     "victory": false,
     "date": "2025-10-01T12:05:23.770067",
     "game_duration": 305.064,
+    "final_reputation": 95
+  },
+  {
+    "player_name": "Jugador",
+    "score": 1166,
+    "earnings": 1111,
+    "orders_completed": 5,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": false,
+    "date": "2025-10-01T12:25:56.939208",
+    "game_duration": 412.49699999999996,
+    "final_reputation": 95
+  },
+  {
+    "player_name": "Jugador",
+    "score": 1166,
+    "earnings": 1111,
+    "orders_completed": 5,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": false,
+    "date": "2025-10-01T13:33:44.795380",
+    "game_duration": 317.64599999999996,
     "final_reputation": 95
   },
   {
@@ -57,6 +99,20 @@
   },
   {
     "player_name": "Jugador",
+    "score": 440,
+    "earnings": 440,
+    "orders_completed": 2,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": false,
+    "date": "2025-10-01T13:45:06.840332",
+    "game_duration": 214.2,
+    "final_reputation": 77
+  },
+  {
+    "player_name": "Jugador",
     "score": 180,
     "earnings": 180,
     "orders_completed": 1,
@@ -67,6 +123,20 @@
     "victory": false,
     "date": "2025-10-01T11:57:51.698309",
     "game_duration": 241.839,
+    "final_reputation": 71
+  },
+  {
+    "player_name": "Jugador",
+    "score": 180,
+    "earnings": 180,
+    "orders_completed": 1,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": false,
+    "date": "2025-10-01T13:34:21.762314",
+    "game_duration": 216.39600000000002,
     "final_reputation": 71
   }
 ]
