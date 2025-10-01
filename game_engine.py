@@ -150,7 +150,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=20.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
+            time_scale=9.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
         )
         self.game_time.start()
 
@@ -158,9 +158,10 @@ class GameEngine:
         self.weather_system = Weather(self.api)
         
         # Configurar meta de ingresos
-        self.income_goal = self.map_data.get("goal", 2000)
+        self.income_goal = self.map_data.get("goal", 300)
         self.game_state.set_income_goal(self.income_goal)
-        
+        self.game_state.set_player_reference(self.player)
+
         # Sistema de undo/redo
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
@@ -194,46 +195,32 @@ class GameEngine:
         return order
     
     def update_order_expirations(self):
-            """Actualiza el estado de expiración de todos los pedidos activos - VERSIÓN CORREGIDA"""
-            current_game_time = self.game_time.get_current_game_time()
-            
-            expired_orders = []
-            
-           # print(f"🔍 Verificando expiraciones a las {current_game_time.strftime('%H:%M:%S')}")
-            
-            # 1. Pedidos activos (aceptados pero no recogidos)
-            for order in list(self.active_orders):
-                if not order.is_in_inventory and not order.is_completed:
-                    time_remaining = order.get_time_remaining(current_game_time)
-                    
-                    if order.check_expiration(current_game_time):
-                        expired_orders.append(order)
-                        print(f"⚠️ Pedido activo {order.id} EXPIRADO")
-                    #else:
-                        # Debug: mostrar tiempo restante para pedidos próximos a expirar
-                        # if time_remaining < 300:  # Menos de 5 minutos
-                        #     print(f"⏰ {order.id}: {time_remaining:.0f}s restantes")
-            
-            # 2. Pedidos en inventario (recogidos pero no entregados)
-            for order in list(self.player.inventory):
-                if order.is_in_inventory and not order.is_completed:
-                    time_remaining = order.get_time_remaining(current_game_time)
-                    
-                    if order.check_expiration(current_game_time):
-                        expired_orders.append(order)
-                        print(f"⚠️ Pedido en inventario {order.id} EXPIRADO")
-                    # else:
-                    #     # Debug: mostrar tiempo restante
-                    #     if time_remaining < 300:
-                    #         print(f"📦 {order.id} (inventario): {time_remaining:.0f}s restantes")
-            
-            # Procesar pedidos expirados
-            for expired_order in expired_orders:
-                self.handle_expired_order(expired_order, current_game_time)
+        """Actualiza el estado de expiración de todos los pedidos activos - CORREGIDO"""
+        current_game_time = self.game_time.get_current_game_time()
+        
+        expired_orders = []
+        
+        # 1. Pedidos activos (aceptados pero no recogidos)
+        for order in list(self.active_orders):  # Usar list() para evitar modificar durante iteración
+            if not order.is_in_inventory and not order.is_completed:
+                if order.check_expiration(current_game_time):
+                    expired_orders.append(order)
+                    print(f"⚠️ Pedido {order.id} EXPIRADO (no recogido) a las {current_game_time.strftime('%H:%M:%S')}")
+        
+        # 2. Pedidos en inventario (recogidos pero no entregados)
+        for order in list(self.player.inventory):  # Usar list() para evitar modificar durante iteración
+            if order.is_in_inventory and not order.is_completed:
+                if order.check_expiration(current_game_time):
+                    expired_orders.append(order)
+                    print(f"⚠️ Pedido {order.id} EXPIRADO (no entregado) a las {current_game_time.strftime('%H:%M:%S')}")
+        
+        # Procesar pedidos expirados
+        for expired_order in expired_orders:
+            self.handle_expired_order(expired_order, current_game_time)
 
     def handle_expired_order(self, order, current_time):
-        """Maneja las consecuencias de un pedido expirado - VERSIÓN MEJORADA"""
-        # Penalización según especificaciones del proyecto: -6 reputación por perder paquete
+        """Maneja las consecuencias de un pedido expirado"""
+        # Penalización por perder/expirar paquete: -6 reputación
         reputation_penalty = 6
         old_reputation = self.player.reputation
         self.player.reputation = max(0, self.player.reputation - reputation_penalty)
@@ -243,226 +230,231 @@ class GameEngine:
         self.game_state.current_streak = 0  # Resetear racha
         
         # Remover de donde esté
-        location = ""
         if order.is_in_inventory:
             # Remover del inventario del jugador
-            if self.player.remove_from_inventory(order.id):
-                location = "inventario"
-            else:
-                location = "inventario (error al remover)"
+            self.player.remove_from_inventory(order.id)
+            location = "inventario"
         else:
             # Remover de pedidos activos
-            if self.active_orders.remove_by_id(order.id):
-                location = "activos"
-            else:
-                location = "activos (error al remover)"
+            self.active_orders.remove_by_id(order.id)
+            location = "activos"
         
-        # Mostrar mensaje al jugador con información detallada
-        time_remaining = order.get_time_remaining(current_time)
+        # Mostrar mensaje al jugador
         message = f"❌ {order.id} EXPIRADO (-{reputation_penalty} reputación)"
         self.ui_manager.show_message(message, 5)
         
-        print(f"📉 Pedido {order.id} expirado desde {location}")
-        print(f"   Reputación: {old_reputation} → {self.player.reputation}")
-        print(f"   Deadline: {order.deadline.strftime('%H:%M:%S')}")
-        print(f"   Hora actual: {current_time.strftime('%H:%M:%S')}")
-        print(f"   Tiempo restante: {time_remaining:.1f}s")
+        print(f"📉 Pedido {order.id} expirado ({location}). Reputación: {old_reputation} → {self.player.reputation}")
+        print(f"⏰ Deadline: {order.deadline.strftime('%H:%M:%S')}, Hora actual: {current_time.strftime('%H:%M:%S')}")
 
     def get_game_start_time_from_json(self):
-        """Extrae la fecha del JSON pero fija la hora a las 12:00 PM"""
+        """Extrae la hora ABSOLUTA de inicio del JSON - CORREGIDO"""
+        try:
+            # Opción 1: Buscar en jobs_data y usar la fecha del primer pedido
+            if self.jobs_data and len(self.jobs_data) > 0:
+                first_job = self.jobs_data['data'][0]  # Acceder a la lista de datos
+                if "deadline" in first_job:
+                    deadline_str = first_job["deadline"]
+                    
+                    # Completar formato si es necesario
+                    if len(deadline_str) == 16:  # "2025-09-01T12:10"
+                        deadline_str += ":00"
+                    
+                    # Parsear la fecha del pedido
+                    deadline = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+                    
+                    # Usar 1 hora antes del primer deadline como inicio
+                    start_time = deadline - timedelta(hours=0.2)
+                    print(f"🕐 Hora calculada desde JSON: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    return start_time
+                        
+        except Exception as e:
+            print(f"⚠️ Error leyendo hora del JSON: {e}")
+        
+        # Fallback: usar la fecha de LOS PEDIDOS pero hora actual del día
         try:
             if self.jobs_data and len(self.jobs_data) > 0:
                 first_job = self.jobs_data['data'][0]
                 deadline_str = first_job["deadline"]
-                
                 if len(deadline_str) == 16:
                     deadline_str += ":00"
                 
-                # Usar la fecha del JSON pero hora fija a las 12:00 PM
+                # Obtener la fecha del pedido pero con hora de inicio razonable (ej: 8:00 AM)
                 deadline_date = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
-                start_time = deadline_date.replace(hour=12, minute=0, second=0, microsecond=0)
-                
-                print(f"🕐 Hora de inicio fijada a las 12:00 PM del {start_time.strftime('%Y-%m-%d')}")
+                start_time = deadline_date.replace(hour=8, minute=0, second=0, microsecond=0)
+                print(f"🕐 Hora fallback desde pedidos: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 return start_time
-                
-        except Exception as e:
-            print(f"⚠️ Error obteniendo fecha del JSON: {e}")
+        except:
+            pass
         
-        # Fallback: fecha actual a las 12:00 PM
-        default_time = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
-        print(f"🕐 Usando fallback: 12:00 PM de hoy")
+        # Último fallback: fecha actual a las 8:00 AM
+        default_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        print(f"🕐 Usando hora por defecto: {default_time.strftime('%Y-%m-%d %H:%M:%S')}")
         return default_time
+
+
     def load_from_save_data(self, save_data):
-            """Carga el estado del juego desde datos guardados - VERSIÓN CORREGIDA"""
-            try:
-                print(f"📄 Cargando partida desde datos guardados...")
-                
-                # ✅ INICIALIZAR TODAS LAS LISTAS DE ÓRDENES
-                self.active_orders = OrderList.create_empty()
-                self.completed_orders = OrderList.create_empty()
-                self.pending_orders = OrderList.create_empty()
-                
-                # Cargar estado del jugador
-                player_data = save_data["player_data"]
-                self.player = Player(
-                    player_data["grid_x"],
-                    player_data["grid_y"], 
-                    self.game_map.tile_size, 
-                    self.game_map.legend
-                )
-                
-                # Restaurar propiedades del jugador
-                self.player.stamina = player_data["stamina"]
-                self.player.reputation = player_data["reputation"]
-                self.player.current_weight = player_data["current_weight"]
-                self.player.state = player_data["state"]
-                self.player.direction = player_data["direction"]
-                
-                # Limpiar inventarios existentes
-                self.player.inventory.clear()
-                self.player.completed_orders.clear()
-                
-                # Cargar inventario
-                for order_data in player_data["inventory"]:
-                    try:
-                        order = self._create_order_from_save_data(order_data)
-                        self.player.add_to_inventory(order)
-                    except Exception as e:
-                        print(f"⚠️ Error cargando orden al inventario: {e}")
-                
-                # Cargar órdenes completadas del jugador
-                for order_data in player_data["completed_orders"]:
-                    try:
-                        order = self._create_order_from_save_data(order_data)
-                        self.player.completed_orders.enqueue(order)
-                    except Exception as e:
-                        print(f"⚠️ Error cargando orden completada: {e}")
-                
-                # Cargar listas de órdenes
-                for order_data in save_data["active_orders"]:
-                    try:
-                        order = self._create_order_from_save_data(order_data)
-                        self.active_orders.enqueue(order)
-                    except Exception as e:
-                        print(f"⚠️ Error cargando orden activa: {e}")
-                
-                for order_data in save_data["completed_orders"]:
-                    try:
-                        order = self._create_order_from_save_data(order_data)
-                        self.completed_orders.enqueue(order)
-                    except Exception as e:
-                        print(f"⚠️ Error cargando orden completada global: {e}")
-                
-                # ✅ CARGAR ÓRDENES PENDIENTES
-                if "pending_orders" in save_data:
-                    for order_data in save_data["pending_orders"]:
-                        try:
-                            order = self._create_order_from_save_data(order_data)
-                            self.pending_orders.enqueue(order)
-                        except Exception as e:
-                            print(f"⚠️ Error cargando orden pendiente: {e}")
-                
-                # Cargar estado del juego
-                game_state_data = save_data["game_state"]
-                self.game_state.total_earnings = game_state_data["total_earnings"]
-                self.game_state.income_goal = game_state_data["income_goal"]
-                self.game_state.game_over = game_state_data["game_over"]
-                self.game_state.victory = game_state_data["victory"]
-                self.game_state.game_over_reason = game_state_data["game_over_reason"]
-                self.game_state.orders_completed = game_state_data["orders_completed"]
-                self.game_state.orders_cancelled = game_state_data["orders_cancelled"]
-                self.game_state.perfect_deliveries = game_state_data["perfect_deliveries"]
-                self.game_state.late_deliveries = game_state_data["late_deliveries"]
-                self.game_state.current_streak = game_state_data["current_streak"]
-                self.game_state.best_streak = game_state_data["best_streak"]
-                
-                # Convertir string de start_time a datetime
-                start_time_str = game_state_data["start_time"]
-                if isinstance(start_time_str, str):
-                    self.game_state.start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                
-                # ✅ CARGAR TIEMPO DE JUEGO - CORREGIDO COMPLETAMENTE
-                game_time_data = save_data["game_time"]
-                elapsed_time = game_time_data.get("elapsed_time_sec", 0)
-                total_duration = game_time_data.get("total_duration", 900)
-                time_scale = game_time_data.get("time_scale", 3.0)  # ← Cargar escala guardada
-                
-                # Obtener tiempo de inicio del juego
-                if "game_start_time" in save_data:
-                    game_start_time_str = save_data["game_start_time"]
-                    if isinstance(game_start_time_str, str):
-                        game_start_time = datetime.fromisoformat(game_start_time_str.replace('Z', '+00:00'))
-                    else:
-                        game_start_time = self.get_game_start_time_from_json()
-                else:
-                    game_start_time = self.get_game_start_time_from_json()
-                
-                # ✅ CREAR GAME_TIME CON DATOS CORRECTOS
-                self.game_time = GameTime(
-                    total_duration_min=total_duration/60,
-                    game_start_time=game_start_time,
-                    time_scale=time_scale
-                )
-                self.game_time.start()
-                
-                # ✅ RESTAURAR TIEMPO TRANSCURRIDO CORRECTAMENTE
-                import pygame
-                current_pygame_time = pygame.time.get_ticks() / 1000.0
-                # Ajustar el tiempo de inicio para que refleje el tiempo transcurrido guardado
-                adjusted_start_time = current_pygame_time - self.game_time.pygame_start_time - elapsed_time
-                self.game_time.start_real_time = adjusted_start_time
-                
-                print(f"🕒 Tiempo restaurado: {elapsed_time:.1f}s transcurridos de {total_duration}s totales")
-                
-                # Cargar clima
-                weather_data = save_data["weather_state"]
-                self.weather_system = Weather(self.api)
-                
-                # Configurar clima actual
+        """Carga el estado del juego desde datos guardados - VERSIÓN MEJORADA"""
+        try:
+            print(f"🔄 Cargando partida desde datos guardados...")
+            
+            # ✅ INICIALIZAR TODAS LAS LISTAS DE ÓRDENES
+            self.active_orders = OrderList.create_empty()
+            self.completed_orders = OrderList.create_empty()
+            self.pending_orders = OrderList.create_empty()
+            
+            # Cargar estado del jugador
+            player_data = save_data["player_data"]
+            self.player = Player(
+                player_data["grid_x"],
+                player_data["grid_y"], 
+                self.game_map.tile_size, 
+                self.game_map.legend
+            )
+            
+            # Restaurar propiedades del jugador
+            self.player.stamina = player_data["stamina"]
+            self.player.reputation = player_data["reputation"]
+            self.player.current_weight = player_data["current_weight"]
+            self.player.state = player_data["state"]
+            self.player.direction = player_data["direction"]
+            self.player.visual_x = player_data.get("visual_x", player_data["grid_x"])
+            self.player.visual_y = player_data.get("visual_y", player_data["grid_y"])
+            
+            # Limpiar inventarios existentes
+            self.player.inventory.clear()
+            self.player.completed_orders.clear()
+            
+            # Cargar inventario
+            for order_data in player_data["inventory"]:
                 try:
-                    from weather import WeatherCondition
-                    condition_str = weather_data["current_condition"]
-                    # Buscar la condición climática correspondiente
-                    for condition in WeatherCondition:
-                        if condition.value == condition_str:
-                            self.weather_system.current_condition = condition
-                            break
-                    
-                    self.weather_system.current_intensity = weather_data.get("current_intensity", 0.0)
-                    self.weather_system.current_multiplier = weather_data.get("current_multiplier", 1.0)
+                    order = self._create_order_from_save_data(order_data)
+                    self.player.add_to_inventory(order)
                 except Exception as e:
-                    print(f"⚠️ Error configurando clima: {e}")
+                    print(f"⚠️ Error cargando orden al inventario: {e}")
+            
+            # Cargar órdenes completadas del jugador
+            for order_data in player_data["completed_orders"]:
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.player.completed_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden completada: {e}")
+            
+            # Cargar listas de órdenes
+            for order_data in save_data["active_orders"]:
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.active_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden activa: {e}")
+            
+            for order_data in save_data["completed_orders"]:
+                try:
+                    order = self._create_order_from_save_data(order_data)
+                    self.completed_orders.enqueue(order)
+                except Exception as e:
+                    print(f"⚠️ Error cargando orden completada global: {e}")
+            
+            # ✅ CARGAR ÓRDENES PENDIENTES
+            if "pending_orders" in save_data:
+                for order_data in save_data["pending_orders"]:
+                    try:
+                        order = self._create_order_from_save_data(order_data)
+                        self.pending_orders.enqueue(order)
+                    except Exception as e:
+                        print(f"⚠️ Error cargando orden pendiente: {e}")
+            
+            # Cargar estado del juego
+            game_state_data = save_data["game_state"]
+            self.game_state.total_earnings = game_state_data["total_earnings"]
+            self.game_state.income_goal = game_state_data["income_goal"]
+            self.game_state.game_over = game_state_data["game_over"]
+            self.game_state.victory = game_state_data["victory"]
+            self.game_state.game_over_reason = game_state_data["game_over_reason"]
+            self.game_state.orders_completed = game_state_data["orders_completed"]
+            self.game_state.orders_cancelled = game_state_data["orders_cancelled"]
+            self.game_state.perfect_deliveries = game_state_data["perfect_deliveries"]
+            self.game_state.late_deliveries = game_state_data["late_deliveries"]
+            self.game_state.current_streak = game_state_data["current_streak"]
+            self.game_state.best_streak = game_state_data["best_streak"]
+            
+            # Convertir string de start_time a datetime
+            start_time_str = game_state_data["start_time"]
+            if isinstance(start_time_str, str):
+                self.game_state.start_time = datetime.fromisoformat(start_time_str)
+            
+            # Cargar tiempo de juego - CORRECCIÓN IMPORTANTE
+            game_time_data = save_data["game_time"]
+            elapsed_time = game_time_data.get("elapsed_time_sec", 0)
+            total_duration = game_time_data.get("total_duration", 900)
+            time_scale = game_time_data.get("time_scale", 1.0)  # ← NUEVO: Cargar escala
+
+            game_start_time_str = save_data.get("game_start_time")
+            if game_start_time_str:
+                game_start_time = datetime.fromisoformat(game_start_time_str.replace('Z', '+00:00'))
+            else:
+                game_start_time = self.get_game_start_time_from_json()        
+
+            self.game_time = GameTime(
+                total_duration_min=total_duration/60,
+                game_start_time=game_start_time,
+                time_scale=time_scale  # ← Cargar escala guardada
+            )
+            self.game_time.start()
+
+            # Reiniciar game_time con la duración correcta
+            # self.game_time = GameTime(total_duration_min=total_duration/60)
+            # self.game_time.start()
+            
+            # Ajustar tiempo transcurrido manualmente
+            current_time_seconds = pygame.time.get_ticks() / 1000.0
+            adjusted_start_time = current_time_seconds - elapsed_time
+            self.game_time.start_time = adjusted_start_time
+            
+            # Cargar clima
+            weather_data = save_data["weather_state"]
+            self.weather_system = Weather(self.api)
+            
+            # Configurar clima actual
+            try:
+                from weather import WeatherCondition
+                condition_str = weather_data["current_condition"]
+                # Buscar la condición climática correspondiente
+                for condition in WeatherCondition:
+                    if condition.value == condition_str:
+                        self.weather_system.current_condition = condition
+                        break
                 
-                # Cargar cámara y meta
-                self.camera_x, self.camera_y = save_data["camera_position"]
-                self.income_goal = save_data["income_goal"]
-                
-                # Reiniciar sistema de undo
-                self.undo_manager = UndoRedoManager(max_states=10)
-                self.undo_manager.save_game_state(self, force=True)
-                
-                print("✅ Partida cargada correctamente")
-                print(f"   - Jugador en posición: ({self.player.grid_x}, {self.player.grid_y})")
-                print(f"   - Órdenes activas: {len(self.active_orders)}")
-                print(f"   - Órdenes en inventario: {len(self.player.inventory)}")
-                print(f"   - Ganancias: ${self.game_state.total_earnings}")
-                print(f"   - Tiempo restante: {self.game_time.get_remaining_time_formatted()}")
-                
+                self.weather_system.current_intensity = weather_data.get("current_intensity", 0.0)
+                self.weather_system.current_multiplier = weather_data.get("current_multiplier", 1.0)
             except Exception as e:
-                print(f"❌ Error al cargar partida: {e}")
-                import traceback
-                traceback.print_exc()
-                print("📄 Iniciando nueva partida...")
-                self.setup_new_game()
+                print(f"⚠️ Error configurando clima: {e}")
+            
+            # Cargar cámara y meta
+            self.camera_x, self.camera_y = save_data["camera_position"]
+            self.income_goal = save_data["income_goal"]
+            
+            # Reiniciar sistema de undo
+            self.undo_manager = UndoRedoManager(max_states=10)
+            self.undo_manager.save_game_state(self, force=True)
+            
+            print("✅ Partida cargada correctamente")
+            
+        except Exception as e:
+            print(f"❌ Error al cargar partida: {e}")
+            import traceback
+            traceback.print_exc()
+            print("🔄 Iniciando nueva partida...")
+            self.setup_new_game()
 
     def _create_order_from_save_data(self, order_data):
-        """Crea una orden desde datos de guardado - MEJORADO"""
+        """Crea una orden desde datos de guardado"""
         from datetime import datetime
         
         # Manejar diferentes formatos de deadline
         deadline = order_data["deadline"]
         if isinstance(deadline, str):
-            deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+            deadline = datetime.fromisoformat(deadline)
         
         # Crear orden
         order = Order(
@@ -479,16 +471,6 @@ class GameEngine:
         # Restaurar color si existe
         if "color" in order_data:
             order.color = tuple(order_data["color"])
-        
-        # Restaurar estados de la orden
-        order.is_expired = order_data.get("is_expired", False)
-        order.is_completed = order_data.get("is_completed", False)
-        order.is_in_inventory = order_data.get("is_in_inventory", False)
-        
-        # Restaurar accepted_time si existe
-        accepted_time_str = order_data.get("accepted_time")
-        if accepted_time_str:
-            order.accepted_time = datetime.fromisoformat(accepted_time_str.replace('Z', '+00:00'))
         
         return order
     def save_game(self, slot_name="slot1"):
@@ -741,15 +723,11 @@ class GameEngine:
         elif self.game_state.total_earnings >= self.income_goal and not self.game_state.game_over:
             print("🎮 Fin del juego: Victoria alcanzada")
             self.game_state.set_game_over(True, "¡Victoria! Meta alcanzada")
-            self.save_final_score(True)
-        elif self.game_state.total_earnings <= self.income_goal and self.pending_orders.is_empty()==True and self.active_orders.is_empty()==True and len(self.player.inventory) == 0 and not self.game_state.game_over:
-            print("🎮 Fin del juego: No quedan pedidos y no se alcanzó la meta")
-            self.game_state.set_game_over(False, "Derrota: No quedan pedidos y no se alcanzó la meta")
-            self.save_final_score(False)
+            self.save_final_score(True)   
 
 
     def save_final_score(self, victory: bool):
-        """Guarda la puntuación final - VERSIÓN MEJORADA"""
+        """Guarda la puntuación final - VERSIÓN CORREGIDA"""
         try:
             print(f"💾 Intentando guardar puntuación final: victoria={victory}")
             
@@ -765,21 +743,47 @@ class GameEngine:
                 print("🔄 Inicializando sistema de puntuación...")
                 score_manager.initialize_score_system()
             
-            game_duration = self.game_time.get_elapsed_real_time()
-            print(f"⏱️ Duración del juego: {game_duration:.1f} segundos")
+            # USAR TIEMPO DE JUEGO REAL
+            game_duration = self.game_time.get_elapsed_game_time()
+            total_game_duration = 15 * 60  # 15 minutos en segundos
+            
+            print(f"⏱️ Duración del juego: {game_duration:.1f}s de {total_game_duration}s totales")
+            
+            # Calcular el puntaje UNA SOLA VEZ y guardarlo en cache
+            final_score = self.game_state.calculate_final_score(game_duration, total_game_duration)
+            
+            # Obtener estadísticas (usará el cache)
+            stats = self.game_state.get_game_stats(game_duration)
+            
+            print(f"📊 ESTADÍSTICAS FINALES:")
+            print(f"   - Reputación final: {self.player.reputation}")
+            print(f"   - Ganancias totales: ${stats['earnings']}")
+            print(f"   - Pedidos completados: {stats['orders_completed']}")
+            print(f"   - Pedidos cancelados: {stats['orders_cancelled']}")
+            print(f"   - Entregas perfectas: {stats['perfect_deliveries']}")
+            print(f"   - Entregas tardías: {stats['late_deliveries']}")
+            print(f"   - Mejor racha: {stats['best_streak']}")
+            print(f"   - Victoria: {victory}")
+            print(f"   - Puntaje calculado: {stats['final_score']}")
             
             # Guardar puntuación
-            success = score_manager.add_score(self.game_state, victory, game_duration)
+            success = score_manager.add_score(
+                self.game_state, 
+                victory, 
+                game_duration,
+                total_game_duration
+            )
             
             if success:
                 print("✅ Puntuación guardada exitosamente en el sistema")
             else:
                 print("❌ Error al guardar puntuación en el sistema principal")
-                
+                    
         except Exception as e:
             print(f"❌ Error guardando puntuación final: {e}")
             import traceback
             traceback.print_exc()
+
     def render(self):
         """Renderiza todos los elementos del juego"""
         self.screen.fill((255, 255, 255))

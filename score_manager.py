@@ -111,18 +111,19 @@ class ScoreManager:
             print(f"❌ Error guardando puntuaciones: {e}")
             return False
     
-    def add_score(self, game_state, victory: bool, game_duration: float, player_name: str = "Jugador") -> bool:
-        """Añade un nuevo puntaje desde GameState - VERSIÓN MEJORADA"""
+    def add_score(self, game_state, victory: bool, game_duration: float, total_game_duration: float = 900, player_name: str = "Jugador") -> bool:
+        """Añade un nuevo puntaje desde GameState - VERSIÓN FUNCIONAL"""
         try:
             print(f"🎯 Iniciando guardado de puntuación...")
             
+            # 1. Verificar inicialización del sistema
             if not self.initialized:
                 print("🔄 Sistema no inicializado, inicializando...")
                 if not self.initialize_score_system():
                     print("❌ No se pudo inicializar el sistema de puntuación")
                     return False
             
-            # Validaciones más estrictas
+            # 2. Validaciones del estado del juego
             if not game_state:
                 print("❌ game_state es None")
                 return False
@@ -134,16 +135,17 @@ class ScoreManager:
             if not game_state.game_over:
                 print("❌ El juego no ha terminado, no se puede guardar puntuación")
                 return False
-                
-            if not game_state.end_time or not game_state.start_time:
-                print("❌ Tiempos de juego no válidos")
+            
+            # 3. Verificar referencia al jugador
+            if not hasattr(game_state, 'player') or game_state.player is None:
+                print("❌ No hay referencia al jugador en game_state")
                 return False
             
-            # Calcular puntaje final
-            final_score = game_state.calculate_final_score()
+            # 4. Calcular puntaje final
+            final_score = game_state.calculate_final_score(game_duration, total_game_duration)
             print(f"📊 Puntaje calculado: {final_score}")
             
-            # Crear entrada de puntuación
+            # 5. Crear entrada de puntuación
             score_entry = {
                 "player_name": player_name,
                 "score": int(final_score),
@@ -155,27 +157,24 @@ class ScoreManager:
                 "best_streak": int(game_state.best_streak),
                 "victory": victory,
                 "date": datetime.now().isoformat(),
-                "game_duration": float(game_duration)
+                "game_duration": float(game_duration),
+                "final_reputation": int(game_state.player.reputation)
             }
             
-            print(f"📝 Entrada de puntuación creada: {score_entry}")
-            
-            # Añadir y ordenar
+            # 6. Añadir y ordenar puntuaciones
             self.scores.append(score_entry)
             self.sort_scores()
             
-            # Mantener solo los top 10 puntajes
+            # 7. Mantener solo los top 10 puntajes
             if len(self.scores) > 10:
                 self.scores = self.scores[:10]
-                print("📊 Manteniendo solo top 10 puntuaciones")
             
-            # Guardar
+            # 8. Guardar en archivo
             success = self.save_scores()
             
             if success:
                 position = self.get_ranking_position(final_score)
                 print(f"🏆 Puntuación añadida exitosamente. Posición: {position}")
-                print(f"📄 Total de puntuaciones guardadas: {len(self.scores)}")
             else:
                 print("❌ Error al guardar puntuaciones en archivo")
             
