@@ -124,7 +124,7 @@ class GameEngine:
             # ✅ VERIFICAR CONSISTENCIA después de cargar
             self.verify_order_consistency()
         else:
-            # Configuración inicial nueva partida
+            # Configuración inicial nueva partidal
             self.setup_new_game()
     
     def setup_new_game(self):
@@ -155,7 +155,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=7.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
+            time_scale=10.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
         )
         self.game_time.start()
 
@@ -783,9 +783,15 @@ class GameEngine:
 
                 penalty = popup_result.get("penalty")
                 if penalty:
+                    # ✅ CORRECCIÓN: Aplicar penalización de reputación
+                    old_reputation = self.player.reputation
                     self.player.reputation = max(0, self.player.reputation - penalty)
-                    if popup_result.get("type") == "cancel_order" and popup_result.get("result") == "confirmed":
-                        self.game_state.orders_cancelled += 1            
+                    
+                    # ✅ CORRECCIÓN: Las cancelaciones ya se registraron en confirm_cancel_order
+                    # Solo mostrar debug para verificar
+                    if (popup_result.get("type") == "cancel_order" and 
+                        popup_result.get("result") == "confirmed"):
+                        print(f"📊 Cancelación confirmada - Total cancelaciones: {self.game_state.orders_cancelled}")        
 
             # AÑADIR: Manejar cancelación desde inventario (click derecho)
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Click derecho
@@ -978,47 +984,64 @@ class GameEngine:
             self.game_state.set_game_over(False, "Derrota: No quedan pedidos y no se alcanzó la meta")
             self.save_final_score(False)
             return
-            
-        
-        
-        
-        
-        # NUEVA CONDICIÓN: Verificar si no quedan pedidos disponibles
+    
         if self.no_more_available_orders():
             print("🎮 Fin del juego: No quedan pedidos disponibles")
             self.game_state.set_game_over(False, "Derrota: No quedan pedidos disponibles")
             self.save_final_score(False)
             return
+  
     def no_more_available_orders(self):
         """Verifica si no quedan pedidos disponibles para completar - VERSIÓN CORREGIDA"""
         
-
-        
-        # Verificar si no hay pedidos activos, pendientes o en inventario
+        # Verificar si no hay pedidos activos, pendientes, en inventario O en popup
         no_active_orders = (
             len(self.active_orders) == 0 and 
             len(self.pending_orders) == 0 and 
-            len(self.player.inventory) == 0
+            len(self.player.inventory) == 0 and
+            not self.popup_manager.has_pending_order()
         )
         
         if not no_active_orders:
-            #print("   ⚠️  Aún hay pedidos disponibles")
             return False
         
-        # Calcular total de pedidos procesados (completados + rechazados)
-        total_processed = len(self.completed_orders) + len(self.rejected_orders)
+        # ✅ CORRECCIÓN: Evitar duplicación - NO sumar orders_cancelled si ya están en rejected_orders
+        # Los pedidos rechazados del popup YA están en rejected_orders
+        # Los pedidos cancelados del inventario NO están en rejected_orders pero SÍ en orders_cancelled
+        
+        # Solo contar cancelaciones que NO sean rechazos del popup
+        unique_cancellations = max(0, self.game_state.orders_cancelled - len(self.rejected_orders))
+        
+        total_processed = (
+            len(self.completed_orders) + 
+            len(self.rejected_orders) +
+            unique_cancellations  # Solo cancelaciones únicas
+        )
+        
+        # También contar pedidos expirados que no están en ninguna lista
+        expired_count = sum(1 for order in self.all_orders if order.is_expired and not order.is_completed)
+        total_processed += expired_count
         
         # Verificar si hemos procesado todos los pedidos del juego
         all_orders_processed = (total_processed >= len(self.all_orders))
         
-        print(f"   Procesados: {total_processed}/{len(self.all_orders)}")
-        
-        if all_orders_processed:
-            print("   ✅ Todos los pedidos han sido procesados")
-        else:
-            print(f"   ❌ Faltan {len(self.all_orders) - total_processed} pedidos por procesar")
-        
+        # DEBUG: Para verificar qué está pasando
+        print(f"🔍 VERIFICACIÓN FIN DEL JUEGO:")
+        print(f"   - Completados: {len(self.completed_orders)}")
+        print(f"   - Rechazados: {len(self.rejected_orders)}")
+        print(f"   - Cancelados (inventario): {self.game_state.orders_cancelled}")
+        print(f"   - Cancelados únicos: {unique_cancellations}")
+        print(f"   - Expirados: {expired_count}")
+        print(f"   - Popup activo: {self.popup_manager.has_pending_order()}")
+        print(f"   - Total procesado: {total_processed}")
+        print(f"   - Total pedidos: {len(self.all_orders)}")
+        print(f"   - ¿Juego debe terminar? {all_orders_processed}")
+
         return all_orders_processed
+
+
+
+
     def save_final_score(self, victory: bool):
         """Guarda la puntuación final - VERSIÓN CORREGIDA"""
         try:
@@ -1048,6 +1071,29 @@ class GameEngine:
             # Obtener estadísticas (usará el cache)
             stats = self.game_state.get_game_stats(game_duration)
             
+            print(f"🔍 VERIFICACIÓN DETALLADA DE CANCELACIONES:")
+            print(f"   - orders_cancelled: {self.game_state.orders_cancelled}")
+            print(f"   - rejected_orders count: {len(self.rejected_orders) if hasattr(self, 'rejected_orders') else 'N/A'}")
+
+            rejected_count = len(self.rejected_orders) if hasattr(self, 'rejected_orders') else 0
+            if rejected_count > 0 and self.game_state.orders_cancelled == 0:
+                print(f"   ⚠️  INCONSISTENCIA: {rejected_count} pedidos rechazados pero orders_cancelled = 0")
+                print(f"   🔧 Corrigiendo automáticamente...")
+                self.game_state.orders_cancelled = rejected_count
+            
+            if self.game_state.orders_cancelled > 0:
+                penalty_amount = self.game_state.orders_cancelled * 100
+                print(f"   ⚠️  Penalización por {self.game_state.orders_cancelled} cancelaciones: -${penalty_amount}")
+            else:
+                print(f"   ✅ Sin cancelaciones - Sin penalización")
+
+            if self.game_state.orders_cancelled > 0:
+                penalty_amount = self.game_state.orders_cancelled * 100
+                print(f"   ⚠️  Penalización por cancelaciones: -${penalty_amount}")
+            else:
+                print(f"   ✅ Sin cancelaciones - Sin penalización")
+
+
             print(f"📊 ESTADÍSTICAS FINALES:")
             print(f"   - Reputación final: {self.player.reputation}")
             print(f"   - Ganancias totales: ${stats['earnings']}")

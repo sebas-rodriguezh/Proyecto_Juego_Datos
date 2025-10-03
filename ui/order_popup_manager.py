@@ -177,16 +177,22 @@ class OrderPopupManager:
             }
     
     def reject_order(self, game_engine):
-        """Procesa el rechazo de un pedido"""
+        """Procesa el rechazo de un pedido - VERSIÓN CORREGIDA"""
         if not self.pending_order:
             return None
         
         order = self.pending_order
         
-        # AÑADIR: Añadir a la lista de pedidos rechazados del game_engine
+        # ✅ CORRECCIÓN CRÍTICA: Registrar como cancelación en game_state
+        game_engine.game_state.orders_cancelled += 1
+        game_engine.game_state.current_streak = 0  # Resetear racha
+        
+        # Añadir a la lista de pedidos rechazados del game_engine
         if hasattr(game_engine, 'rejected_orders'):
             game_engine.rejected_orders.enqueue(order)
             print(f"📝 Pedido {order.id} añadido a rechazados. Total: {len(game_engine.rejected_orders)}")
+        
+        print(f"📊 Rechazo registrado como cancelación - Total cancelaciones: {game_engine.game_state.orders_cancelled}")
         
         # Limpiar popup
         self.popup_active = False
@@ -198,8 +204,10 @@ class OrderPopupManager:
             "result": "rejected", 
             "order": order,
             "message": f"Pedido {order.id} rechazado (-1 reputación)",
-            "penalty": 1  # Añadir penalización para aplicar después
+            "penalty": 1
         }
+        
+
     def confirm_cancel_order(self, game_state, player):
         """Confirma la cancelación de un pedido del inventario"""
         if not self.selected_order_for_cancel:
@@ -212,7 +220,8 @@ class OrderPopupManager:
   
             # Actualizar estadísticas
             game_state.orders_cancelled += 1
-            
+            game_state.current_streak = 0
+
             print(f"🗑️ Pedido {order.id} CANCELADO del inventario")
             
             # Limpiar popup

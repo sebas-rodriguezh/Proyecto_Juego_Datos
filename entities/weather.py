@@ -151,7 +151,6 @@ class Weather:
         
         # Cambiar clima solo cuando el burst termine
         elif self.burst_timer >= self.burst_duration:
-            print(f"🔄 Cambiando clima después de {self.burst_duration:.1f}s")
             self.change_weather()
         
         # Actualizar partículas
@@ -171,9 +170,6 @@ class Weather:
             "intensity": self.target_intensity,
             "duration": self.burst_duration
         })
-        
-        print(f"✅ Clima cambiado a: {self.current_condition.value} (intensidad: {self.target_intensity:.2f})")
-        print(f"   Color: {self.WEATHER_COLORS[self.current_condition]}")
     
     def change_weather(self):
         """Cambia el clima usando la cadena de Markov del JSON"""
@@ -218,10 +214,7 @@ class Weather:
         self.transition_timer = 0
         self.transition_start_multiplier = self.current_multiplier
         
-        print(f"🌤️ Transición: {self.current_condition.value} → {self.target_condition.value}")
-        print(f"   Intensidad: {self.target_intensity:.2f}, Multiplicador: {self.target_multiplier:.2f}")
-        print(f"   Color objetivo: {self.WEATHER_COLORS[self.target_condition]}")
-        print(f"   Próximo cambio en: {self.burst_duration}s")
+
     
     def get_stamina_consumption(self):
         """Calcula el consumo adicional de stamina basado en el clima actual"""

@@ -83,26 +83,47 @@ class InteractionManager:
         else:
             self.show_message("Error: Pedido no encontrado en inventario", 2)
 
+    # def record_delivery_stats(self, game_state, order, current_time, reputation_change):
+    #     """Registra estadísticas de la entrega según el timing"""
+    #     timeliness = order.get_delivery_timeliness(current_time)
+        
+    #     game_state.orders_completed += 1
+        
+    #     if timeliness == "early":
+    #         game_state.perfect_deliveries += 1
+    #         print(f"🎯 Entrega TEMPRANA: {order.id}")
+    #         self.show_message(f"🎯 ¡Entrega TEMPRANA! +5 reputación", 3)
+
+    #     elif timeliness == "on_time":
+    #         game_state.perfect_deliveries += 1
+    #         print(f"🎯 Entrega A TIEMPO: {order.id}")
+    #         self.show_message(f"✅ Entrega A TIEMPO! +3 reputación", 3)
+           
+    #     elif timeliness == "late":
+    #         game_state.late_deliveries += 1
+    #         print(f"⏰ Entrega TARDÍA: {order.id}")
+    #         self.show_message(f"⏰ Entrega TARDÍA - Penalización aplicada", 3)
+
+
     def record_delivery_stats(self, game_state, order, current_time, reputation_change):
-        """Registra estadísticas de la entrega según el timing"""
+        """Registra estadísticas de la entrega según el timing - VERSIÓN CORREGIDA"""
         timeliness = order.get_delivery_timeliness(current_time)
         
         game_state.orders_completed += 1
         
-        if timeliness == "early":
+        # ✅ CORRECCIÓN CRÍTICA: Solo contar como "perfecta" si NO hubo penalización de reputación
+        if reputation_change >= 0:  # Sin penalización = perfecta
             game_state.perfect_deliveries += 1
-            print(f"🎯 Entrega TEMPRANA: {order.id}")
-            self.show_message(f"🎯 ¡Entrega TEMPRANA! +5 reputación", 3)
-
-        elif timeliness == "on_time":
-            game_state.perfect_deliveries += 1
-            print(f"🎯 Entrega A TIEMPO: {order.id}")
-            self.show_message(f"✅ Entrega A TIEMPO! +3 reputación", 3)
-           
-        elif timeliness == "late":
+            if timeliness == "early":
+                print(f"🎯 Entrega TEMPRANA: {order.id}")
+                self.show_message(f"🎯 ¡Entrega TEMPRANA! +5 reputación", 3)
+            elif timeliness == "on_time":
+                print(f"🎯 Entrega A TIEMPO: {order.id}")
+                self.show_message(f"✅ Entrega A TIEMPO! +3 reputación", 3)
+        else:  # Con penalización = tardía
             game_state.late_deliveries += 1
             print(f"⏰ Entrega TARDÍA: {order.id}")
-            self.show_message(f"⏰ Entrega TARDÍA - Penalización aplicada", 3)
+            self.show_message(f"⏰ Entrega TARDÍA - Penalización aplicada", 3)        
 
 
     def handle_pickup_interaction(self, order, interaction, game_state, current_time):
