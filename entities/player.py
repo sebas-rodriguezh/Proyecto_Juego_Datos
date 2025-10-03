@@ -1,4 +1,5 @@
 # Player.py - VERSIÓN CORREGIDA con movimiento adecuado
+from collections import deque
 from datetime import datetime
 from entities.order_list import OrderList
 from entities.order import Order
@@ -40,6 +41,22 @@ class Player:
         self.animation_time = 0
         self.animation_speed = 0.2  # Animación más lenta
         self.current_job = None
+        self.state_history = deque(maxlen=10)  # Últimos 10 estados
+
+        self._save_current_state()
+
+
+    def _save_current_state(self):
+        """Guarda el estado actual en la pila de historial"""
+        state_snapshot = {
+            'stamina': self.stamina,
+            'reputation': self.reputation,
+            'state': self.state,
+            'position': (self.grid_x, self.grid_y),
+            'weight': self.current_weight,
+            'timestamp': datetime.now().strftime('%H:%M:%S')
+        }
+        self.state_history.append(state_snapshot)
 
     def load_sprites(self):
         try:
@@ -276,6 +293,7 @@ class Player:
         # Solo imprimir si el estado cambió
         if new_state != old_state:
             self.state = new_state
+            self._save_current_state()
             if new_state == "exhausted":
                 print("¡¡¡EXHAUSTED!!! - Stamina agotada - NO PUEDE MOVERSE")
             elif new_state == "tired":

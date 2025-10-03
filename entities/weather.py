@@ -1,4 +1,5 @@
 # weather.py - VERSIÓN COMPLETAMENTE REVISADA
+from collections import deque
 import random
 import pygame
 import requests
