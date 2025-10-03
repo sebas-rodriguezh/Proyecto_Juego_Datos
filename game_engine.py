@@ -171,6 +171,10 @@ class GameEngine:
         self.undo_manager = UndoRedoManager(max_states=10)
         self.undo_manager.save_game_state(self, force=True)
         
+        print("\n" + "="*50)
+        self.verify_order_deadlines()
+        print("="*50 + "\n")
+        
 # Añadir este método en game_engine.py
     def _create_order_from_save_data(self, order_data):
         """Crea una orden desde datos de guardado"""
@@ -251,19 +255,53 @@ class GameEngine:
         print(f"📉 Pedido {order.id} expirado ({location}). Reputación: {old_reputation} → {self.player.reputation}")
         print(f"⏰ Deadline: {order.deadline.strftime('%H:%M:%S')}, Hora actual: {current_time.strftime('%H:%M:%S')}")
 
+    def verify_order_deadlines(self):
+        """Verifica que todos los deadlines sean correctos"""
+        print(f"\n=== VERIFICACIÓN DE DEADLINES ===")
+        print(f"🕐 Hora inicio juego: {self.game_time.game_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        all_orders = list(self.all_orders) if hasattr(self, 'all_orders') else []
+        
+        print(f"\n📦 TODOS LOS PEDIDOS ({len(all_orders)}):")
+        for order in all_orders:
+            time_remaining = order.get_time_remaining(self.game_time.get_current_game_time())
+            minutes = time_remaining / 60
+            print(f"   {order.id}: {time_remaining:.0f}s ({minutes:.1f} min) - {order.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Verificar consistencia
+        expected_date = self.game_time.game_start_time.date()
+        inconsistent_orders = []
+        
+        for order in all_orders:
+            if order.deadline.date() != expected_date:
+                inconsistent_orders.append(order)
+        
+        if inconsistent_orders:
+            print(f"\n⚠️  PEDIDOS CON FECHA INCONSISTENTE:")
+            for order in inconsistent_orders:
+                print(f"   {order.id}: {order.deadline.strftime('%Y-%m-%d')} (esperado: {expected_date})")
+        else:
+            print(f"\n✅ Todos los pedidos tienen la fecha correcta: {expected_date}")
+
     def get_game_start_time_from_json(self):
-        """Extrae la hora de inicio desde map_data - VERSIÓN ACTUALIZADA"""
+        """Extrae la hora de inicio desde map_data - VERSIÓN CORREGIDA CON DEBUG"""
         try:
             # ✅ PRIORIDAD 1: Usar start_time del mapa si existe
             if "start_time" in self.map_data.get("data", {}):
                 start_time_str = self.map_data["data"]["start_time"]
                 
-                # Remover Z si existe
+                print(f"🕐 START_TIME RAW: {start_time_str}")  # DEBUG
+                
+                # Remover Z y convertir a datetime
                 if start_time_str.endswith('Z'):
                     start_time_str = start_time_str[:-1]
                 
+                # Asegurar formato completo
+                if len(start_time_str) == 16:  # Formato YYYY-MM-DDTHH:MM
+                    start_time_str += ":00"
+                
                 start_time = datetime.fromisoformat(start_time_str)
-                print(f"🕕 Hora de inicio desde map_data: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"✅ START_TIME PARSED: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 return start_time
             
             # FALLBACK: Buscar en el primer pedido
@@ -271,8 +309,9 @@ class GameEngine:
                 first_job = self.jobs_data['data'][0]
                 if "deadline" in first_job:
                     deadline_str = first_job["deadline"]
+                    print(f"🕐 USING FIRST JOB DEADLINE: {deadline_str}")
                     
-                    # Manejar Z
+                    # Convertir deadline y restar tiempo estimado
                     if deadline_str.endswith('Z'):
                         deadline_str = deadline_str[:-1]
                     
@@ -280,18 +319,20 @@ class GameEngine:
                         deadline_str += ":00"
                     
                     deadline = datetime.fromisoformat(deadline_str)
-                    start_time = deadline - timedelta(hours=0.2)
-                    print(f"🕕 Hora calculada desde deadline: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    # Asumir que el juego empieza 10 minutos antes del primer deadline
+                    start_time = deadline - timedelta(minutes=10)
+                    print(f"✅ CALCULATED START_TIME: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     return start_time
                         
         except Exception as e:
-            print(f"⚠️ Error leyendo hora del JSON: {e}")
+            print(f"❌ ERROR leyendo hora del JSON: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Último fallback
         default_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
-        print(f"🕕 Usando hora por defecto: {default_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"⚠️ USING DEFAULT START_TIME: {default_time.strftime('%Y-%m-%d %H:%M:%S')}")
         return default_time
-
     def load_from_save_data(self, save_data):
         """Carga el estado del juego desde datos guardados - VERSIÓN COMPLETA MEJORADA"""
         try:

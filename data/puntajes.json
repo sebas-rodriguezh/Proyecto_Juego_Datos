@@ -15,6 +15,20 @@
   },
   {
     "player_name": "Jugador",
+    "score": 1293,
+    "earnings": 1125,
+    "orders_completed": 5,
+    "orders_cancelled": 0,
+    "perfect_deliveries": 0,
+    "late_deliveries": 0,
+    "best_streak": 0,
+    "victory": true,
+    "date": "2025-10-02T20:35:58.073614",
+    "game_duration": 317.47799999999995,
+    "final_reputation": 95
+  },
+  {
+    "player_name": "Jugador",
     "score": 1281,
     "earnings": 1115,
     "orders_completed": 5,
@@ -124,19 +138,5 @@
     "date": "2025-10-01T11:22:25.913172",
     "game_duration": 180.819,
     "final_reputation": 80
-  },
-  {
-    "player_name": "Jugador",
-    "score": 440,
-    "earnings": 440,
-    "orders_completed": 2,
-    "orders_cancelled": 0,
-    "perfect_deliveries": 0,
-    "late_deliveries": 0,
-    "best_streak": 0,
-    "victory": false,
-    "date": "2025-10-01T13:45:06.840332",
-    "game_duration": 214.2,
-    "final_reputation": 77
   }
 ]

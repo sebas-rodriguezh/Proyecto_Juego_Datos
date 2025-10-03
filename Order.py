@@ -21,40 +21,59 @@ class Order:
     is_in_inventory: bool = field(default=False, init=False)
     accepted_time: datetime = field(default=None, init=False)
 
+
     @classmethod
     def from_dict(cls, data: dict):
         deadline_str = data['deadline']
         
-        # ✅ NUEVO: Manejar formato con Z (UTC)
+        print(f"🔄 PARSING DEADLINE: {deadline_str}")  # DEBUG
+        
+        # ✅ CORRECCIÓN CRÍTICA: Manejar formato correctamente
         if deadline_str.endswith('Z'):
             deadline_str = deadline_str[:-1]  # Remover la Z
         
         # Completar formato si es necesario
-        if len(deadline_str) == 16:
-            deadline_str += ":00"
+        if len(deadline_str) == 16:  # "2025-09-01T12:10"
+            deadline_str += ":00"     # "2025-09-01T12:10:00"
+        
+        try:
+            deadline = datetime.fromisoformat(deadline_str)
+            print(f"✅ DEADLINE PARSED: {deadline.strftime('%Y-%m-%d %H:%M:%S')}")  # DEBUG
+        except Exception as e:
+            print(f"❌ ERROR PARSING DEADLINE: {e}")
+            # Fallback: usar hora actual + 15 minutos
+            deadline = datetime.now() + timedelta(minutes=15)
         
         return cls(
             id=data['id'],
             pickup=data['pickup'],
             dropoff=data['dropoff'],
             payout=data['payout'],
-            deadline=datetime.fromisoformat(deadline_str),
+            deadline=deadline,
             weight=data['weight'],
             priority=data['priority'],
             release_time=data['release_time']
         )
-    
     def _normalize_times_for_comparison(self, current_time):
-        """NUEVO: Normaliza fechas para comparación consistente"""
-        # Usar el mismo día para ambas fechas
-        game_day = current_time.date()
+        """CORREGIDO: Normaliza fechas para comparación consistente usando solo la fecha del juego"""
+        if not isinstance(current_time, datetime) or not isinstance(self.deadline, datetime):
+            return current_time, self.deadline
         
-        # Normalizar deadline al día del juego pero mantener la hora original
+        # Usar SOLO la fecha del current_time (que viene del juego)
+        game_date = current_time.date()
+        
+        # Normalizar deadline para usar la misma fecha pero mantener su hora original
         normalized_deadline = self.deadline.replace(
-            year=game_day.year,
-            month=game_day.month,
-            day=game_day.day
+            year=game_date.year,
+            month=game_date.month,
+            day=game_date.day
         )
+        
+        # Debug información
+        # print(f"🔍 NORMALIZACIÓN TIEMPO - Pedido {self.id}:")
+        # print(f"   Current: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        # print(f"   Deadline original: {self.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
+        # print(f"   Deadline normalizado: {normalized_deadline.strftime('%Y-%m-%d %H:%M:%S')}")
         
         return current_time, normalized_deadline
     
@@ -79,15 +98,17 @@ class Order:
         return False
     
     def get_time_remaining(self, current_time: datetime) -> float:
-        """Retorna el tiempo restante en segundos"""
+        """Retorna el tiempo restante en segundos - VERSIÓN CORREGIDA"""
         if self.is_expired or self.is_completed:
             return 0
         
-        # Normalizar fechas
+        # Normalizar fechas para usar misma fecha
         normalized_current, normalized_deadline = self._normalize_times_for_comparison(current_time)
         
+        # Calcular diferencia
         delta = normalized_deadline - normalized_current
         remaining_seconds = delta.total_seconds()
+    
         
         return max(0, remaining_seconds)  # Nunca negativo
     

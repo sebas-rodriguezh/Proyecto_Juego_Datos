@@ -143,7 +143,7 @@ class OrderList:
     
     @classmethod
     def from_api_response(cls, api_response: dict) -> 'OrderList':
-        """Crea una OrderList directamente desde la respuesta de la API"""
+        """Crea una OrderList directamente desde la respuesta de la API - CORREGIDO"""
         order_list = cls()
         
         job_colors = [
@@ -151,33 +151,23 @@ class OrderList:
             (255, 100, 255), (100, 255, 255)
         ]
         
+        print(f"📦 PROCESANDO {len(api_response['data'])} PEDIDOS DESDE API:")
+        
         for i, order_data in enumerate(api_response['data']):
-            if isinstance(order_data['deadline'], str):
-                try:
-                    deadline = datetime.strptime(order_data['deadline'], '%Y-%m-%dT%H:%M')
-                except ValueError:
-                    deadline = datetime.now()
-            else:
-                deadline = order_data['deadline']
+            print(f"   Pedido {i+1}: {order_data['id']}")
+            print(f"     Deadline raw: {order_data['deadline']}")
             
+            # Usar el método corregido de Order para crear el pedido
+            order = Order.from_dict(order_data)
+            
+            # Asignar color
             color_index = i % len(job_colors)
-            color = job_colors[color_index]
+            order.color = job_colors[color_index]
             
-            order = Order(
-                id=order_data['id'],
-                pickup=order_data['pickup'],
-                dropoff=order_data['dropoff'],
-                payout=order_data['payout'],
-                deadline=deadline,
-                weight=order_data['weight'],
-                priority=order_data['priority'],
-                release_time=order_data['release_time'],
-                color=color
-            )
             order_list.enqueue(order)
+            print(f"     ✅ Creado: {order.id} - Deadline: {order.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
         
         return order_list
-    
     @classmethod
     def from_list(cls, orders: List[Order]) -> 'OrderList':
         """Crea una OrderList desde una lista de Orders existente"""
