@@ -58,15 +58,27 @@ class GameState:
             self.perfect_deliveries += 1
             self.current_streak += 1
             self.best_streak = max(self.best_streak, self.current_streak)
+            print(f"🔍 DEBUG STREAK: Entrega a tiempo - racha: {self.current_streak}")
         elif early:
             self.perfect_deliveries += 1
             self.current_streak += 1
             self.best_streak = max(self.best_streak, self.current_streak)
+            print(f"🔍 DEBUG STREAK: Entrega temprana - racha: {self.current_streak}")
         else:
             self.late_deliveries += 1
             self.current_streak = 0
+            print(f"🔍 DEBUG STREAK: Entrega tardía - racha rota")
         
-        # Invalidar cache cuando cambian las estadísticas
+        if self.current_streak >= 3:
+                # Solo aplicar el bonus una vez por cada racha de 3
+                if self.current_streak % 3 == 0:
+                    reputation_bonus = 2
+                    old_reputation = getattr(self.player, 'reputation', 70)
+                    if hasattr(self.player, 'reputation'):
+                        self.player.reputation = min(100, self.player.reputation + reputation_bonus)
+                        print(f"🏆 BONUS DE RACHA: +{reputation_bonus} reputación por racha de {self.current_streak} entregas perfectas")
+                        print(f"   Reputación: {old_reputation} → {self.player.reputation}")        
+
         self._cached_final_score = None
     
     def cancel_order(self):
