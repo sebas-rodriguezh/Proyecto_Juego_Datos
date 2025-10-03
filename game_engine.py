@@ -1083,6 +1083,7 @@ class GameEngine:
         
         # Dibujar juego normal
         self.render_map()
+        self.weather_system.draw_particles(self.screen, self.camera_x, self.camera_y)
         self.ui_manager.draw_order_markers(self.active_orders, self.player, self.camera_x, self.camera_y)
         self.player.draw(self.screen, self.camera_x, self.camera_y)
         
