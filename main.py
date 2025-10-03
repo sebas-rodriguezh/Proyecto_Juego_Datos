@@ -1,9 +1,9 @@
 # main.py - VERSIÓN ACTUALIZADA CON INICIALIZACIÓN CENTRALIZADA
 import pygame
 import sys
-from main_menu import MainMenu
-from setup_directories import setup_directories
-from score_manager import initialize_score_system
+from ui.main_menu import MainMenu
+from utils.setup_directories import setup_directories
+from utils.score_manager import initialize_score_system
 
 def main():
     pygame.init()

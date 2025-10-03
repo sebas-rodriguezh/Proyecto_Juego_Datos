@@ -1,24 +1,24 @@
 # game_engine.py - VERSIÓN COMPLETA ACTUALIZADA CON SISTEMA DE GUARDADO/CARGA
 import pygame
 from datetime import datetime
-from Player import Player
-from map import Map
-from api_manager import APIManager
-from weather import Weather
-from game_time import GameTime
-from OrderList import OrderList
-from Order import Order
-from ui_manager import UIManager
-from interaction_manager import InteractionManager
-from game_state import GameState
-from undo_stack import UndoRedoManager
-from setup_directories import setup_directories
+from entities.player import Player
+from ui.map import Map
+from api.api_manager import APIManager
+from entities.weather import Weather
+from core.game_time import GameTime
+from entities.order_list import OrderList
+from entities.order import Order
+from ui.ui_manager import UIManager
+from utils.interaction_manager import InteractionManager
+from core.game_state import GameState
+from utils.undo_stack import UndoRedoManager
+from utils.setup_directories import setup_directories
 import json
 import os
-from save_load_manager import SaveLoadManager
+from utils.save_load_manager import SaveLoadManager
 from datetime import timedelta
-from OrderPopupManager import OrderPopupManager
-from score_manager import score_manager
+from ui.order_popup_manager import OrderPopupManager
+from utils.score_manager import score_manager
     
 class GameEngine:
     """Motor principal del juego que coordina todos los sistemas"""
@@ -32,11 +32,11 @@ class GameEngine:
         except:
             print("❌ Error inicializando fuentes de Pygame")
         # ✅ PRIMERO inicializar el sistema de puntuación
-        from setup_directories import setup_directories
+        from utils.setup_directories import setup_directories
         setup_directories()  # Esto creará la carpeta 'saves'
         
         # ✅ INICIALIZAR score_manager ANTES de usarlo
-        from score_manager import score_manager
+        from utils.score_manager import score_manager
         score_manager.initialize_score_system()
         
         # Configuración inicial
@@ -60,7 +60,7 @@ class GameEngine:
         
         # LUEGO configurar managers (después de que el player exista)
         self.setup_managers()
-        from pause_menu import PauseMenu
+        from ui.pause_menu import PauseMenu
         self.pause_menu = PauseMenu(self.screen, self.save_manager)
         
         # Variables de control del bucle principal
@@ -155,7 +155,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=3.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
+            time_scale=7.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
         )
         self.game_time.start()
 
@@ -522,7 +522,7 @@ class GameEngine:
             
             # Configurar clima actual
             try:
-                from weather import WeatherCondition
+                from entities.weather import WeatherCondition
                 condition_str = weather_data["current_condition"]
                 # Buscar la condición climática correspondiente
                 for condition in WeatherCondition:
@@ -1029,7 +1029,7 @@ class GameEngine:
                 print("⚠️ El juego no ha terminado, no se puede guardar puntuación")
                 return
                 
-            from score_manager import score_manager
+            from utils.score_manager import score_manager
             
             # Asegurar inicialización
             if not score_manager.initialized:

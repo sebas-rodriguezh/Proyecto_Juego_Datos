@@ -1,7 +1,7 @@
 # main_menu.py - MEJORADO PARA MANEJAR EVENTOS Y GUARDADO/CARGA
 import pygame
 import sys
-from save_load_manager import SaveLoadManager
+from utils.save_load_manager import SaveLoadManager
 
 class MainMenu:
     def __init__(self, screen):
@@ -183,7 +183,7 @@ class MainMenu:
     def load_high_scores(self):
         """Carga las puntuaciones desde el archivo"""
         try:
-            from score_manager import score_manager
+            from utils.score_manager import score_manager
             score_manager.initialize_score_system()
             return score_manager.get_top_scores(10)
         except:

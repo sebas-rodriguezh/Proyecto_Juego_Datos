@@ -1,5 +1,5 @@
 import pygame
-from api_manager import APIManager   # Importa la clase desde api_manager.py
+from api.api_manager import APIManager   # Importa la clase desde api_manager.py
 
 class Map:
     # Colores RGB para cada tipo de celda

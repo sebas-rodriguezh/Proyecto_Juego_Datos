@@ -1,10 +1,10 @@
 from collections.abc import Iterator
-from Order import Order
+from entities.order import Order
 from collections import deque
 from typing import List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from api_manager import APIManager
+from api.api_manager import APIManager
 import requests
 
 

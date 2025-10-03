@@ -1,8 +1,8 @@
 # Player.py - VERSIÓN CORREGIDA con movimiento adecuado
 from datetime import datetime
-from OrderList import OrderList
-from Order import Order
-from Speed_Movement import Speed_Movement
+from entities.order_list import OrderList
+from entities.order import Order
+from core.speed_movement import Speed_Movement
 import pygame
 import os
 
@@ -40,10 +40,24 @@ class Player:
         self.animation_time = 0
         self.animation_speed = 0.2  # Animación más lenta
         self.current_job = None
-    
+
     def load_sprites(self):
         try:
-            sprite_sheet_image = pygame.image.load("bicicleta.png").convert_alpha()
+            current_dir = os.path.dirname(__file__)  # Directorio actual del archivo
+            assets_dir = os.path.join(current_dir, '..', 'assets')  # Subir un nivel y entrar a assets
+            image_path = os.path.join(assets_dir, 'bicicleta.png')
+            
+            # Normalizar la ruta para eliminar ../
+            image_path = os.path.normpath(image_path)
+            
+            print(f"🖼️ Intentando cargar imagen desde: {image_path}")
+            
+            # Verificar si el archivo existe
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"No se encontró el archivo: {image_path}")
+            
+            # Cargar la imagen
+            sprite_sheet_image = pygame.image.load(image_path).convert_alpha()
             
             # Escalar al tamaño del tile
             scaled_image = pygame.Surface((self.target_size, self.target_size), pygame.SRCALPHA)
