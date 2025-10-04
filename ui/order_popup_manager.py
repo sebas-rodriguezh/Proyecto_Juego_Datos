@@ -18,7 +18,7 @@ class OrderPopupManager:
         self.cancel_popup_active = False
         self.selected_order_for_cancel = None
         
-        # Configurar fuentes
+        # Configurar fuentess
         self.setup_fonts()
         
     def setup_fonts(self):
