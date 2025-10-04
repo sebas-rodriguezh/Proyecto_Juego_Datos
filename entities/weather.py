@@ -33,13 +33,12 @@ class Weather:
         WeatherCondition.COLD: 0.92
     }
     
-    # Colores para representar cada condición climática
     WEATHER_COLORS = {
         WeatherCondition.CLEAR: (255, 255, 100),
         WeatherCondition.CLOUDS: (200, 200, 220),
-        WeatherCondition.RAIN_LIGHT: (150, 150, 255),  # ✅ Azul claro
-        WeatherCondition.RAIN: (100, 100, 255),        # ✅ Azul medio  
-        WeatherCondition.STORM: (150, 50, 200),        # ✅ Púrpura
+        WeatherCondition.RAIN_LIGHT: (150, 150, 255),  
+        WeatherCondition.RAIN: (100, 100, 255),          
+        WeatherCondition.STORM: (150, 50, 200),        
         WeatherCondition.FOG: (180, 180, 200),
         WeatherCondition.WIND: (200, 220, 255),
         WeatherCondition.HEAT: (255, 150, 50),
@@ -53,104 +52,65 @@ class Weather:
         # Cargar datos del clima DESDE API O CACHÉ
         self.weather_data = self.load_weather_data()
         
-        # Estado actual del clima - USAR DATOS REALES DEL JSON
+        # Estado actual del clima
         initial_data = self.weather_data["data"]["initial"]
         self.current_condition = WeatherCondition(initial_data["condition"])
         self.current_intensity = initial_data["intensity"]
         self.current_multiplier = self.SPEED_MULTIPLIERS[self.current_condition]
         
-        # Estado objetivo (próximo clima)
+        # Estado objetivo
         self.target_condition = self.current_condition
         self.target_intensity = self.current_intensity
         self.target_multiplier = self.current_multiplier
         
-        # Bursts de prueba (1-2 segundos)
+
         self.burst_timer = 0
         self.transition_timer = 0
-        self.burst_duration = random.randint(1, 2)
+        self.burst_duration = random.randint(45, 60)
         
-        # USAR MATRIZ DE TRANSICIÓN DEL JSON
         self.transition_matrix = self.weather_data["data"]["transition"]
         
-        # Para transiciones suaves
         self.is_transitioning = False
         self.transition_start_multiplier = self.current_multiplier
         
-        # Historial de cambios climáticos
         self.weather_history = []
         
-        # Sistema de partículas
         self.particles = []
         self.particle_timer = 0
-        
-        print(f"🌤️ Sistema de clima inicializado: {self.current_condition.value} (intensidad: {self.current_intensity})")
-        print(f"   Color asignado: {self.WEATHER_COLORS[self.current_condition]}")
         
     def load_weather_data(self):
         """Carga los datos del clima desde la API o desde caché local"""
         try:
-            # OBTENER DATOS DEL API MANAGER (que ya maneja caché)
             weather_data = self.api_manager.get_weather()
-            print("✅ Datos de clima cargados desde API/caché")
             return weather_data
             
         except Exception as e:
-            print(f"❌ Error cargando datos de clima: {e}")
-            print("🔄 Intentando cargar desde caché directa...")
-            
-            # FALLBACK: Cargar directamente desde archivo de caché
             cache_path = os.path.join("api_cache", "weather_data.json")
             try:
                 if os.path.exists(cache_path):
                     with open(cache_path, 'r', encoding='utf-8') as f:
                         weather_data = json.load(f)
-                    print("✅ Datos de clima cargados desde caché directa")
                     return weather_data
             except Exception as cache_error:
-                print(f"❌ Error cargando desde caché: {cache_error}")
+                print(f"Error cargando desde caché: {cache_error}")
             
-            # ÚLTIMO FALLBACK: Usar datos mínimos basados en el JSON proporcionado
-            print("⚠️ Usando datos de clima mínimos")
-            return {
-                "version": "1.2",
-                "data": {
-                    "city": "TigerCity",
-                    "initial": {"condition": "clear", "intensity": 0.1},
-                    "conditions": ["clear", "clouds", "rain_light", "rain", "storm", "fog", "wind", "heat", "cold"],
-                    "transition": {
-                        "clear": {"clear": 0.2, "clouds": 0.2, "wind": 0.2, "heat": 0.2, "cold": 0.2},
-                        "clouds": {"clear": 0.2, "clouds": 0.2, "rain_light": 0.2, "wind": 0.2, "fog": 0.2},
-                        "rain_light": {"clouds": 0.333, "rain_light": 0.333, "rain": 0.333},
-                        "rain": {"rain_light": 0.25, "rain": 0.25, "storm": 0.25, "clouds": 0.25},
-                        "storm": {"rain": 0.5, "clouds": 0.5},
-                        "fog": {"clouds": 0.333, "fog": 0.333, "clear": 0.333},
-                        "wind": {"wind": 0.333, "clouds": 0.333, "clear": 0.333},
-                        "heat": {"heat": 0.333, "clear": 0.333, "clouds": 0.333},
-                        "cold": {"cold": 0.333, "clear": 0.333, "clouds": 0.333}
-                    }
-                }
-            }
+        raise Exception(f"No se pudieron cargar los datos del clima: {e}. También falló la carga desde caché: {cache_error}")
     
     def update(self, dt):
         """Actualiza el estado del clima"""
-        # Actualizar temporizador de ráfaga
         self.burst_timer += dt
         
-        # Si estamos en transición, actualizar el multiplicador
         if self.is_transitioning:
             self.transition_timer += dt
             progress = min(1.0, self.transition_timer / self.transition_duration)
             
-            # Interpolar suavemente entre el multiplicador inicial y el objetivo
             self.current_multiplier = self.transition_start_multiplier + (
                 self.target_multiplier - self.transition_start_multiplier
             ) * progress
             
-            # Si la transición ha terminado
             if progress >= 1.0:
                 self.complete_transition()
         
-        # Cambiar clima solo cuando el burst termine
         elif self.burst_timer >= self.burst_duration:
             self.change_weather()
         
@@ -165,7 +125,6 @@ class Weather:
         self.current_multiplier = self.target_multiplier
         self.is_transitioning = False
         
-        # Registrar en el historial
         self.weather_history.append({
             "condition": self.current_condition.value,
             "intensity": self.target_intensity,
@@ -174,20 +133,16 @@ class Weather:
     
     def change_weather(self):
         """Cambia el clima usando la cadena de Markov del JSON"""
-        # Reiniciar temporizador
         self.burst_timer = 0
-        self.burst_duration = random.randint(1, 2)
+        self.burst_duration = random.randint(45, 60)
         
         # Obtener probabilidades de transición para el clima actual DEL JSON
         current_condition_str = self.current_condition.value
         transition_probs = self.transition_matrix.get(current_condition_str, {})
         
         if not transition_probs:
-            print(f"⚠️ No hay transiciones definidas para {current_condition_str}")
-            # Mantener el mismo clima si no hay transiciones
             self.target_condition = self.current_condition
         else:
-            # Seleccionar el próximo clima basado en las probabilidades del JSON
             rand_val = random.random()
             cumulative_prob = 0
             selected_condition = None
@@ -198,19 +153,17 @@ class Weather:
                     selected_condition = condition
                     break
             
-            # Si no se seleccionó ningún clima (por redondeo), usar el primero
             if selected_condition is None:
                 selected_condition = list(transition_probs.keys())[0]
             
             self.target_condition = WeatherCondition(selected_condition)
         
-        # Establecer intensidad aleatoria (0-1)
+        # Establecer intensidad.
         self.target_intensity = random.random()
         
-        # Obtener multiplicador objetivo
+
         self.target_multiplier = self.SPEED_MULTIPLIERS[self.target_condition]
         
-        # Iniciar transición
         self.is_transitioning = True
         self.transition_timer = 0
         self.transition_start_multiplier = self.current_multiplier
@@ -235,22 +188,20 @@ class Weather:
         """Devuelve el multiplicador de velocidad actual"""
         return self.current_multiplier
     
-    # SISTEMA DE PARTÍCULAS MEJORADO
     def spawn_particles(self, dt):
         """Genera nuevas partículas según el clima actual"""
         self.particle_timer += dt
         
-        # Ajustar tasa de spawn según el clima actual
         spawn_rates = {
-            WeatherCondition.CLEAR: 0.0,      # Sin partículas
-            WeatherCondition.CLOUDS: 0.0,     # Sin partículas  
-            WeatherCondition.RAIN_LIGHT: 0.04, # Lluvia ligera - más partículas
-            WeatherCondition.RAIN: 0.02,      # Lluvia normal
-            WeatherCondition.STORM: 0.01,     # Tormenta - muchas partículas
-            WeatherCondition.FOG: 0.1,        # Niebla
-            WeatherCondition.WIND: 0.06,      # Viento
-            WeatherCondition.HEAT: 0.0,       # Sin partículas
-            WeatherCondition.COLD: 0.08       # Frío/Nieve
+            WeatherCondition.CLEAR: 0.0,      
+            WeatherCondition.CLOUDS: 0.0,     
+            WeatherCondition.RAIN_LIGHT: 0.04, 
+            WeatherCondition.RAIN: 0.02,      
+            WeatherCondition.STORM: 0.01,     
+            WeatherCondition.FOG: 0.1,        
+            WeatherCondition.WIND: 0.06,      
+            WeatherCondition.HEAT: 0.0,       
+            WeatherCondition.COLD: 0.08       
         }
         
         spawn_rate = spawn_rates.get(self.current_condition, 0.01)
@@ -258,7 +209,6 @@ class Weather:
         if self.particle_timer >= spawn_rate:
             self.particle_timer = 0
             
-            # Crear partículas según el clima actual
             if self.current_condition in [WeatherCondition.RAIN_LIGHT, WeatherCondition.RAIN, WeatherCondition.STORM]:
                 self.create_rain_particle()
             elif self.current_condition == WeatherCondition.COLD:
@@ -290,44 +240,40 @@ class Weather:
             life = random.uniform(3, 5)
             length = random.randint(4, 8)
         
-        # Añadir tipo para identificar la partícula
         self.particles.append([x, y, vx, vy, life, length, "rain"])
     
     def create_snow_particle(self):
         """Crea una partícula de nieve"""
         x = random.randint(0, 1920)
         y = random.randint(-50, 0)
-        vx = random.uniform(-25, 25)  # Más movimiento horizontal
-        vy = random.uniform(20, 40)   # Más lento que la lluvia
-        life = random.uniform(6, 10)  # Vida más larga
-        size = random.uniform(2.0, 4.0)  # Tamaño variable
+        vx = random.uniform(-25, 25)  
+        vy = random.uniform(20, 40)   
+        life = random.uniform(6, 10)  
+        size = random.uniform(2.0, 4.0)  
         
-        # Añadir tipo para identificar la partícula
         self.particles.append([x, y, vx, vy, life, size, "snow"])
     
     def create_fog_particle(self):
         """Crea una partícula de niebla"""
         x = random.randint(0, 1920)
         y = random.randint(0, 1080)
-        vx = random.uniform(-10, 10)   # Movimiento lento
-        vy = random.uniform(-3, 3)     # Movimiento vertical mínimo
-        life = random.uniform(4, 8)    # Vida larga
-        size = random.randint(40, 80)  # Partículas grandes
-        alpha = random.randint(15, 35) # Más transparente
+        vx = random.uniform(-10, 10)   
+        vy = random.uniform(-3, 3)     
+        life = random.uniform(4, 8)    
+        size = random.randint(40, 80)  
+        alpha = random.randint(15, 35) 
         
-        # Añadir tipo para identificar la partícula
         self.particles.append([x, y, vx, vy, life, size, alpha, "fog"])
     
     def create_wind_particle(self):
         """Crea una partícula de viento (líneas)"""
         x = random.randint(-100, 0)
         y = random.randint(0, 1080)
-        vx = random.uniform(250, 400)  # Muy rápido horizontalmente
-        vy = random.uniform(-15, 15)   # Poco movimiento vertical
-        life = random.uniform(0.8, 1.5) # Vida corta
-        length = random.randint(25, 50) # Líneas largas
+        vx = random.uniform(250, 400) 
+        vy = random.uniform(-15, 15)   
+        life = random.uniform(0.8, 1.5) 
+        length = random.randint(25, 50) 
         
-        # Añadir tipo para identificar la partícula
         self.particles.append([x, y, vx, vy, life, length, "wind"])
     
     def update_particles(self, dt):
@@ -338,9 +284,8 @@ class Weather:
             # Actualizar posición
             particle[0] += particle[2] * dt
             particle[1] += particle[3] * dt
-            particle[4] -= dt  # Reducir vida
+            particle[4] -= dt  
             
-            # Solo mantener partículas con vida positiva y dentro de límites razonables
             if particle[4] > 0 and -200 < particle[0] < 2120 and -200 < particle[1] < 1280:
                 particles_to_keep.append(particle)
         
@@ -361,13 +306,12 @@ class Weather:
                 
                 if particle_type == "rain":
                     length = particle[5]
-                    # ✅ USAR COLORES CORRECTOS SEGÚN EL CLIMA
                     if self.current_condition == WeatherCondition.STORM:
                         color = (100, 100, 255)   
                     elif self.current_condition == WeatherCondition.RAIN:
-                        color = (100, 100, 255)  # Azul medio para lluvia
+                        color = (100, 100, 255) 
                     else:  # RAIN_LIGHT
-                        color = (150, 150, 255)  # Azul claro para lluvia ligera
+                        color = (150, 150, 255) 
                     
                     pygame.draw.line(screen, color, (int(x), int(y)), 
                                    (int(x + particle[2]*0.1), int(y + length)), 2)
@@ -378,7 +322,6 @@ class Weather:
                         pygame.draw.circle(screen, (255, 255, 255), (int(x), int(y)), size)
                 
                 elif particle_type == "fog":
-                    # Verificar que la partícula tenga suficientes elementos
                     if len(particle) >= 8:
                         size = particle[5]
                         alpha = particle[6]
@@ -409,11 +352,11 @@ class Weather:
             # Dibujar líneas de lluvia con colores diferentes
             for i in range(3):
                 if self.current_condition == WeatherCondition.STORM:
-                    color = (150, 50, 200)   # Púrpura
+                    color = (150, 50, 200)   
                 elif self.current_condition == WeatherCondition.RAIN:
-                    color = (100, 100, 255)  # Azul medio
+                    color = (100, 100, 255) 
                 else:  # RAIN_LIGHT
-                    color = (150, 150, 255)  # Azul claro
+                    color = (150, 150, 255)  
                 
                 pygame.draw.line(screen, color, (x-5+i*5, y-5), (x-5+i*5, y+5), 2)
         elif self.current_condition == WeatherCondition.FOG:

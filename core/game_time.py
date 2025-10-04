@@ -1,8 +1,8 @@
-# game_time.py - VERSIÓN CORREGIDA PARA FECHAS CONSISTENTES
 import pygame
 from datetime import datetime, timedelta
 
 class GameTime:
+    #Todos los métodos O(1)
     def __init__(self, total_duration_min=15, game_start_time=None, time_scale=3.0):
         self.real_duration = total_duration_min * 60  
         self.time_scale = time_scale
@@ -12,7 +12,6 @@ class GameTime:
         else:
             self.game_start_time = game_start_time
         
-        # NUEVO: Usar tiempo relativo desde la inicialización
         self.pygame_start_time = pygame.time.get_ticks() / 1000.0
         self.start_real_time = None
         
@@ -24,10 +23,8 @@ class GameTime:
         """Inicia el temporizador del juego"""
         current_pygame_time = pygame.time.get_ticks() / 1000.0
         self.start_real_time = current_pygame_time - self.pygame_start_time
-        
         self.paused = False
         self.pause_duration = 0
-        print(f"⏱️ Temporizador iniciado. Hora de juego inicial: {self.game_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     def pause(self):
         if not self.paused and self.start_real_time is not None:
@@ -57,7 +54,7 @@ class GameTime:
         return max(0, elapsed)
     
     def normalize_date_to_game_day(self, datetime_obj):
-        """CORREGIDO: Normaliza cualquier datetime para usar la fecha del juego"""
+        """Normaliza cualquier datetime para usar la fecha del juego"""
         if isinstance(datetime_obj, datetime):
             return datetime_obj.replace(
                 year=self.game_start_time.year,
@@ -82,18 +79,10 @@ class GameTime:
         elapsed_real = self.get_elapsed_real_time()
         return elapsed_real * self.time_scale
     
-    # NUEVO MÉTODO PARA DEBUGGING
     def debug_time_comparison(self, order_deadline):
         """Compara tiempo actual vs deadline para debugging"""
         current_time = self.get_current_game_time()
         normalized_deadline = self.normalize_date_to_game_day(order_deadline)
-        
-        print(f"🕐 DEBUG TIEMPO:")
-        print(f"   Tiempo actual juego: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   Deadline original: {order_deadline.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   Deadline normalizado: {normalized_deadline.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   Diferencia: {(normalized_deadline - current_time).total_seconds():.1f}s")
-        
         return current_time, normalized_deadline
     
     def get_remaining_real_time(self):
@@ -121,5 +110,6 @@ class GameTime:
     def update(self, dt):
         pass
     
+
     def get_total_duration(self):
         return self.real_duration

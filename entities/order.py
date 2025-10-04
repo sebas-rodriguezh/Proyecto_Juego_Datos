@@ -1,4 +1,3 @@
-# Order.py - VERSIÓN CORREGIDA PARA FECHAS CONSISTENTES
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import List
@@ -26,11 +25,8 @@ class Order:
     def from_dict(cls, data: dict):
         deadline_str = data['deadline']
         
-        print(f"🔄 PARSING DEADLINE: {deadline_str}")  # DEBUG
-        
-        # ✅ CORRECCIÓN CRÍTICA: Manejar formato correctamente
         if deadline_str.endswith('Z'):
-            deadline_str = deadline_str[:-1]  # Remover la Z
+            deadline_str = deadline_str[:-1] 
         
         # Completar formato si es necesario
         if len(deadline_str) == 16:  # "2025-09-01T12:10"
@@ -38,10 +34,8 @@ class Order:
         
         try:
             deadline = datetime.fromisoformat(deadline_str)
-            print(f"✅ DEADLINE PARSED: {deadline.strftime('%Y-%m-%d %H:%M:%S')}")  # DEBUG
         except Exception as e:
             print(f"❌ ERROR PARSING DEADLINE: {e}")
-            # Fallback: usar hora actual + 15 minutos
             deadline = datetime.now() + timedelta(minutes=15)
         
         return cls(
@@ -68,13 +62,6 @@ class Order:
             month=game_date.month,
             day=game_date.day
         )
-        
-        # Debug información
-        # print(f"🔍 NORMALIZACIÓN TIEMPO - Pedido {self.id}:")
-        # print(f"   Current: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        # print(f"   Deadline original: {self.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
-        # print(f"   Deadline normalizado: {normalized_deadline.strftime('%Y-%m-%d %H:%M:%S')}")
-        
         return current_time, normalized_deadline
     
     
@@ -87,10 +74,10 @@ class Order:
         # Normalizar fechas para comparación
         normalized_current, normalized_deadline = self._normalize_times_for_comparison(current_time)
         
-        # Expirar EXACTAMENTE en el deadline o después
+        # Expirar EXACTAMENTE en el deadline
         if normalized_current >= normalized_deadline:
             self.is_expired = True
-            print(f"⏰ Pedido {self.id} EXPIRÓ")
+            print(f"Pedido {self.id} EXPIRÓ")
             print(f"   Deadline: {normalized_deadline.strftime('%H:%M:%S')}")
             print(f"   Hora actual: {normalized_current.strftime('%H:%M:%S')}")
             return True
@@ -110,7 +97,7 @@ class Order:
         remaining_seconds = delta.total_seconds()
     
         
-        return max(0, remaining_seconds)  # Nunca negativo
+        return max(0, remaining_seconds)
     
     def get_delivery_timeliness(self, current_time: datetime) -> str:
         """Determina la puntualidad de la entrega - VERSIÓN MEJORADA"""
@@ -123,7 +110,6 @@ class Order:
         
         # Calcular porcentaje de tiempo usado basado en tiempo total disponible
         if self.accepted_time:
-            # Usar tiempo desde que se aceptó el pedido
             normalized_current, _ = self._normalize_times_for_comparison(current_time)
             normalized_accepted = self.accepted_time.replace(
                 year=normalized_current.year,
@@ -142,21 +128,20 @@ class Order:
             else:
                 percentage_used = 100
         else:
-            # Usar tiempo estimado por defecto
-            total_available_time = 900  # 15 minutos
+            total_available_time = 900  
             time_used = total_available_time - time_remaining
             percentage_used = (time_used / total_available_time) * 100
         
-        # Categorizar según especificaciones del proyecto
-        if percentage_used <= 50:  # Usó ≤50% del tiempo → Temprana
+        # Categorizar
+        if percentage_used <= 50:  # Usó ≤50% del tiempo, este puede ser 20 profe, pero la verdad es que no es muy funcional, además para efectos prácticos, mejor este. 
             return "early"
-        elif time_remaining > 120:  # Más de 2 minutos restantes → A tiempo
+        elif time_remaining > 120:  # Más de 2 minutos restantes
             return "on_time"
-        elif time_remaining > 30:   # 31-120 segundos → Tarde leve
+        elif time_remaining > 30:   # 31-120 segundos 
             return "late_120"
-        elif time_remaining > 0:    # 1-30 segundos → Tarde severa
+        elif time_remaining > 0:    # 1-30 segundos 
             return "late_30"
-        else:                       # 0 segundos o menos → Muy tarde
+        else:                       # 0 segundos o menos 
             return "very_late"
     
     def calculate_reputation_change(self, current_time: datetime) -> int:
@@ -184,25 +169,7 @@ class Order:
         
         return 0
     
-    def get_urgency_color(self, current_time: datetime) -> tuple:
-        """Retorna color según urgencia del pedido"""
-        if self.is_completed:
-            return (100, 100, 100)  # Gris - completado
-        if self.is_expired:
-            return (50, 50, 50)     # Gris oscuro - expirado
-        
-        time_remaining = self.get_time_remaining(current_time)
-        
-        # Colores según tiempo restante
-        if time_remaining <= 30:           # ≤30 segundos
-            return (255, 0, 0)             # Rojo - crítico
-        elif time_remaining <= 120:        # 31-120 segundos  
-            return (255, 165, 0)           # Naranja - urgente
-        elif time_remaining <= 300:        # 2-5 minutos
-            return (255, 255, 0)           # Amarillo - atención
-        else:                              # >5 minutos
-            return (0, 200, 0)             # Verde - tranquilo
-    
+
     def calculate_payout_modifier(self, current_time: datetime, player_reputation: int) -> float:
         """Calcula modificadores de pago según especificaciones"""
         modifier = 1.0
