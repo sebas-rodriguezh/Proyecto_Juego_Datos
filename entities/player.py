@@ -1,4 +1,3 @@
-# Player.py - VERSIÓN CORREGIDA con movimiento adecuado
 from collections import deque
 from datetime import datetime
 from entities.order_list import OrderList
@@ -9,16 +8,15 @@ import os
 
 class Player:
     def __init__(self, x, y, tile_size, legend, scale_factor=1):
-        # Posición en COORDENADAS DE MAPA (enteras)
+        #COORDENADAS DE MAPA
         self.grid_x = int(x)
         self.grid_y = int(y)
         
-        # Movimiento por casillas con cooldown
         self.is_moving = False
         self.move_cooldown = 0
-        self.move_cooldown_duration = 0.3  # AUMENTADO a 300ms para movimiento más lento
+        self.move_cooldown_duration = 0.3  
         
-        # Sistema de velocidad integrado
+        # Sistema de velocidad 
         self.speed_system = Speed_Movement(velocidad_base=3.0)
         
         # Stats del jugador
@@ -35,13 +33,13 @@ class Player:
         self.tile_size = tile_size
         self.legend = legend
         self.scale_factor = scale_factor
-        self.target_size = tile_size  # Tamaño igual al tile
+        self.target_size = tile_size 
         self.sprite_sheet = self.load_sprites()
         self.current_frame = 0
         self.animation_time = 0
-        self.animation_speed = 0.2  # Animación más lenta
+        self.animation_speed = 0.2  
         self.current_job = None
-        self.state_history = deque(maxlen=10)  # Últimos 10 estados
+        self.state_history = deque(maxlen=10)  
 
         self._save_current_state()
 
@@ -60,23 +58,18 @@ class Player:
 
     def load_sprites(self):
         try:
-            current_dir = os.path.dirname(__file__)  # Directorio actual del archivo
-            assets_dir = os.path.join(current_dir, '..', 'assets')  # Subir un nivel y entrar a assets
+            current_dir = os.path.dirname(__file__)
+            assets_dir = os.path.join(current_dir, '..', 'assets')
             image_path = os.path.join(assets_dir, 'bicicleta.png')
             
-            # Normalizar la ruta para eliminar ../
             image_path = os.path.normpath(image_path)
             
-            print(f"🖼️ Intentando cargar imagen desde: {image_path}")
-            
-            # Verificar si el archivo existe
+        
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"No se encontró el archivo: {image_path}")
             
-            # Cargar la imagen
             sprite_sheet_image = pygame.image.load(image_path).convert_alpha()
             
-            # Escalar al tamaño del tile
             scaled_image = pygame.Surface((self.target_size, self.target_size), pygame.SRCALPHA)
             pygame.transform.smoothscale(
                 sprite_sheet_image, 
@@ -141,11 +134,9 @@ class Player:
         if self.move_cooldown > 0:
             return False
             
-        # ✅ CORRECCIÓN CRÍTICA: Verificar estado EXHAUSTED primero
         if self.state == "exhausted":
             return False
         
-        # ✅ También verificar si stamina es 0 (por si acaso)
         if self.stamina <= 0:
             print("❌ Stamina insuficiente para moverse (agotado)")
             self.state = "exhausted"
@@ -171,20 +162,17 @@ class Player:
         velocidad_final *= weather_multiplier
         
         if velocidad_final <= 0:
-            print("❌ Velocidad <= 0, no se puede mover")
             return False
         
-        # Calcular consumo ANTES de mover
         stamina_consumption = self.calculate_stamina_consumption(velocidad_final, weather_multiplier)
         
-        # ✅ CORRECCIÓN: Verificar si hay suficiente stamina para este movimiento
+        #Verificar si hay suficiente stamina para este movimiento
         if self.stamina < stamina_consumption:
             print(f"❌ Stamina insuficiente para moverse: {self.stamina:.1f} < {stamina_consumption:.1f}")
             
-            # ✅ Si no hay suficiente, consumir lo que queda y cambiar a exhausted
             if self.stamina > 0:
                 remaining_stamina = self.stamina
-                self.consume_stamina(remaining_stamina)  # Consumir stamina restante
+                self.consume_stamina(remaining_stamina)  
             return False
         
         # MOVIMIENTO EXITOSO
@@ -201,12 +189,10 @@ class Player:
         elif dy < 0:
             self.direction = "up"
         
-        # Cooldown inversamente proporcional a la velocidad
         base_cooldown = 0.5
         self.move_cooldown = base_cooldown / max(0.1, velocidad_final)
         self.move_cooldown = max(0.1, min(1.0, self.move_cooldown))
         
-        # Consumir stamina DESPUÉS de moverse exitosamente
         self.consume_stamina(stamina_consumption)
         
         self.is_moving = True
@@ -215,8 +201,8 @@ class Player:
 
     def calculate_stamina_consumption(self, velocidad_final, weather_multiplier):
         """Calcula el consumo de stamina POR CELDA movida"""
-        # Consumo BASE por celda (según especificaciones del proyecto)
-        base_consumption = 0.5  # -0.5 base por celda como dice el documento
+        # Consumo BASE por celda 
+        base_consumption = 0.5 
         
         # Penalización por peso (si lleva más de 3kg)
         weight_penalty = 0
@@ -226,7 +212,6 @@ class Player:
         # Penalización por clima adverso
         weather_penalty = 0
         if weather_multiplier < 0.9:  # Clima adverso
-            # Ajustar según el clima específico (rain/wind: -0.1, storm: -0.3, heat: -0.2)
             if weather_multiplier <= 0.75:  # Storm
                 weather_penalty = 0.3
             elif weather_multiplier <= 0.85:  # Rain
@@ -235,18 +220,14 @@ class Player:
                 weather_penalty = 0.2
         
         total_consumption = base_consumption + weight_penalty + weather_penalty
-        
-        # ✅ CORRECCIÓN: Más velocidad = MÁS consumo de stamina
-        # Ajustar por velocidad (moverse rápido cansa más)
-        speed_factor = 1.0 + (3.0 - min(velocidad_final, 3.0)) * 0.3  # Velocidad baja = más esfuerzo
+
+        speed_factor = 1.0 + (3.0 - min(velocidad_final, 3.0)) * 0.3  
         total_consumption *= speed_factor
         
-       # print(f"💪 Consumo stamina: base={base_consumption:.2f}, peso={weight_penalty:.2f}, clima={weather_penalty:.2f}, velocidad_factor={speed_factor:.2f}")
         
         return total_consumption
     def update_movement(self, dt, weather_stamina_consumption=0):
         """Actualiza el cooldown del movimiento y la animación"""
-        # Actualizar cooldown
         if self.move_cooldown > 0:
             self.move_cooldown -= dt
             if self.move_cooldown <= 0:
@@ -257,7 +238,7 @@ class Player:
         if not self.is_moving:
             self.recover_stamina(dt)
         
-        # Actualizar animación (más lenta cuando está tired/exhausted)
+
         animation_modifier = 1.0
         if self.state == "tired":
             animation_modifier = 0.7
@@ -277,11 +258,9 @@ class Player:
         
         self.stamina -= consumption
         
-        # ✅ CORRECCIÓN: Asegurar que no baje de 0
         if self.stamina < 0:
             self.stamina = 0
         
-        # ✅ CORRECCIÓN PRINCIPAL: Actualizar estados de manera más estricta
         if self.stamina <= 0:
             new_state = "exhausted"
             self.stamina = 0
@@ -290,27 +269,26 @@ class Player:
         else:
             new_state = "normal"
         
-        # Solo imprimir si el estado cambió
         if new_state != old_state:
             self.state = new_state
             self._save_current_state()
             if new_state == "exhausted":
-                print("¡¡¡EXHAUSTED!!! - Stamina agotada - NO PUEDE MOVERSE")
+                print("EXHAUSTED: Stamina agotada y no puede moverse.")
             elif new_state == "tired":
-                print("Estado TIRED - Se mueve más lento pero PUEDE MOVERSE")
+                print("TIRED: Se mueve más lento.")
             elif new_state == "normal":
-                print("Estado NORMAL - Movimiento normal")
+                print("NORMAL: Movimiento normal")
 
 
     def recover_stamina(self, dt, at_rest_point=False):
         """Recupera stamina cuando no se está moviendo"""
-        # No recuperar si ya está al máximo
+
         if self.stamina >= 100:
             return
         
-        recovery_rate = 5.0  # +5 por segundo (base)
+        recovery_rate = 5.0  # +5 por segundo.
         if at_rest_point:
-            recovery_rate = 10.0  # +10 por segundo en puntos de descanso
+            recovery_rate = 10.0  
         
         recovery = recovery_rate * dt
         old_stamina = self.stamina
@@ -318,18 +296,15 @@ class Player:
         
         self.stamina = min(100, self.stamina + recovery)
         
-        # ✅ CORRECCIÓN CRÍTICA: Manejar correctamente la transición de exhausted
         if old_state == "exhausted" and self.stamina >= 30:
             self.state = "tired"
-            print(f"✅ Recuperado de EXHAUSTED a TIRED - Stamina: {self.stamina:.1f}/30 - Ahora PUEDE MOVERSE")
         elif old_state == "exhausted" and self.stamina > 0:
             # Seguir en exhausted hasta llegar a 30
-            if int(old_stamina) != int(self.stamina):  # Solo imprimir cuando cambie el número entero
-                #print(f"🔄 Recuperando de EXHAUSTED: {self.stamina:.1f}/30")
+            if int(old_stamina) != int(self.stamina):  
                 pass
                 
         else:
-            # Actualizar estado normal/tired para otros casos
+            # Actualizar estado normal/tired.
             if self.stamina <= 30:
                 new_state = "tired"
             else:
@@ -374,7 +349,7 @@ class Player:
                 adjacent.append((self.grid_x + dx, self.grid_y + dy))
         return adjacent
     
-    def get_interactable_orders(self, orders, game_map, radius=1, game_time=None):
+    def get_interactable_orders(self, orders, game_map, radius=1, game_time=None): # O(n)
         interactable = []
         
         if game_time is None:
@@ -443,49 +418,35 @@ class Player:
         return (self.grid_x, self.grid_y)
     
     def add_to_inventory(self, order: Order) -> bool:
-        print(f"DEBUG: Intentando añadir {order.id} (peso: {order.weight}kg)")
-        print(f"DEBUG: Peso actual: {self.current_weight}kg, Capacidad máxima: {self.max_weight}kg")
-        
         if self.current_weight + order.weight <= self.max_weight:
             self.inventory.enqueue(order)
             self.current_weight += order.weight
-            print(f"DEBUG: ✅ {order.id} añadido. Nuevo peso: {self.current_weight}kg")
             return True
         else:
-            print(f"DEBUG: ❌ No se puede añadir {order.id}. Peso necesario: {order.weight}kg, Espacio disponible: {self.max_weight - self.current_weight}kg")
             return False
     
     def remove_from_inventory(self, order_id: str) -> bool:
-        print(f"DEBUG: Intentando remover {order_id}")
-        print(f"DEBUG: Peso antes de remover: {self.current_weight}kg")
-        
         order = self.inventory.find_by_id(order_id)
         if order:
             removed = self.inventory.remove_by_id(order_id)
             if removed:
                 self.current_weight -= order.weight
-                print(f"DEBUG: ✅ {order_id} removido. Peso reducido en {order.weight}kg")
-                print(f"DEBUG: Peso después de remover: {self.current_weight}kg")
                 return True
             else:
-                print(f"ERROR: No se pudo remover {order_id} del inventario")
                 return False
         else:
-            print(f"ERROR: Pedido {order_id} no encontrado en inventario")
             return False
   
     def verify_weight_consistency(self):
         calculated_weight = sum(order.weight for order in self.inventory)
         if self.current_weight != calculated_weight:
-            print(f"ERROR: Inconsistencia de peso! Actual: {self.current_weight}, Calculado: {calculated_weight}")
             self.current_weight = calculated_weight
-            print(f"Peso corregido a: {self.current_weight}kg")
         return self.current_weight == calculated_weight
 
     def can_pickup_order(self, order: Order) -> bool:
         return self.current_weight + order.weight <= self.max_weight
     
-    def get_nearby_orders(self, orders, max_distance=1):
+    def get_nearby_orders(self, orders, max_distance=1):  # O(n)
         nearby_orders = []
         for order in orders:
             pickup_dist = abs(self.grid_x - order.pickup[0]) + abs(self.grid_y - order.pickup[1])

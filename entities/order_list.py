@@ -51,7 +51,7 @@ class OrderList:
         """Limpia toda la cola"""
         self._orders.clear()
     
-    def find_by_id(self, order_id: str) -> Optional[Order]:
+    def find_by_id(self, order_id: str) -> Optional[Order]: # O(n)
         """Busca una orden por su ID"""
         for order in self._orders:
             if order.id == order_id:
@@ -59,27 +59,26 @@ class OrderList:
         return None
     
 
-    def remove_by_id(self, order_id: str) -> bool:
+    def remove_by_id(self, order_id: str) -> bool: # O(n)
         """Remueve una orden por su ID manteniendo la estructura de cola"""
-        # Crear una nueva cola sin el elemento a eliminar
         new_orders = deque()
         removed = False
         for order in self._orders:
             if order.id == order_id and not removed:
-                removed = True  # Remover solo la primera ocurrencia
+                removed = True
                 continue
             new_orders.append(order)
         
         self._orders = new_orders
         return removed
 
-    def get_highest_priority(self) -> int:
+    def get_highest_priority(self) -> int: # O(n)
         """Obtiene la prioridad más alta de todas las órdenes"""
         if self.is_empty():
             return -1
         return max(order.priority for order in self._orders)
 
-    def filter_by_priority(self, priority: int) -> List[Order]:
+    def filter_by_priority(self, priority: int) -> List[Order]: # O(n)
         """Filtra órdenes por nivel de prioridad"""
         return [order for order in self._orders if order.priority == priority]
     
@@ -98,13 +97,12 @@ class OrderList:
         """Convierte la OrderList a una lista Python"""
         return list(self._orders)
     
-    def _insertion_sort_by_priority(self, arr: List[Order]) -> List[Order]:
+    def _insertion_sort_by_priority(self, arr: List[Order]) -> List[Order]: # O(n^2)
         """Ordena una lista de órdenes por prioridad usando Insertion Sort (mayor prioridad primero)"""
         for i in range(1, len(arr)):
             key = arr[i]
             j = i - 1
             
-            # Mover elementos de arr[0..i-1] que tienen menor prioridad que key
             while j >= 0 and arr[j].priority < key.priority:
                 arr[j + 1] = arr[j]
                 j -= 1
@@ -112,13 +110,12 @@ class OrderList:
             
         return arr
     
-    def _insertion_sort_by_payout(self, arr: List[Order]) -> List[Order]:
+    def _insertion_sort_by_payout(self, arr: List[Order]) -> List[Order]: # O(n^2)
         """Ordena una lista de órdenes por payout usando Insertion Sort (mayor payout primero)"""
         for i in range(1, len(arr)):
             key = arr[i]
             j = i - 1
             
-            # Mover elementos de arr[0..i-1] que tienen menor payout que key
             while j >= 0 and arr[j].payout < key.payout:
                 arr[j + 1] = arr[j]
                 j -= 1
@@ -126,13 +123,12 @@ class OrderList:
             
         return arr
     
-    def _insertion_sort_by_deadline(self, arr: List[Order]) -> List[Order]:
+    def _insertion_sort_by_deadline(self, arr: List[Order]) -> List[Order]: # O(n^2)
         """Ordena una lista de órdenes por deadline usando Insertion Sort (fechas más cercanas primero)"""
         for i in range(1, len(arr)):
             key = arr[i]
             j = i - 1
             
-            # Mover elementos de arr[0..i-1] que tienen deadlines más lejanos que key
             while j >= 0 and arr[j].deadline > key.deadline:
                 arr[j + 1] = arr[j]
                 j -= 1
@@ -140,16 +136,15 @@ class OrderList:
             
         return arr
     
-    def reorganize_by_priority(self) -> None:
+    def reorganize_by_priority(self) -> None: # O(n^2)
         """Reorganiza la cola poniendo las órdenes de mayor prioridad al frente usando Insertion Sort"""
         if self.is_empty():
             return
-        # Convertir a lista, ordenar por prioridad usando insertion sort, y reconstruir deque
         orders_list = list(self._orders)
         sorted_orders = self._insertion_sort_by_priority(orders_list)
         self._orders = deque(sorted_orders)
     
-    def reorganize_by_payout(self) -> None:
+    def reorganize_by_payout(self) -> None: # O(n^2)
         """Reorganiza la cola poniendo las órdenes de mayor payout al frente usando Insertion Sort"""
         if self.is_empty():
             return
@@ -157,7 +152,7 @@ class OrderList:
         sorted_orders = self._insertion_sort_by_payout(orders_list)
         self._orders = deque(sorted_orders)
     
-    def reorganize_by_deadline(self) -> None:
+    def reorganize_by_deadline(self) -> None: # O(n^2)
         """Reorganiza la cola poniendo las órdenes más urgentes (deadline cercano) al frente usando Insertion Sort"""
         if self.is_empty():
             return
@@ -180,7 +175,7 @@ class OrderList:
         return batch
     
     @classmethod
-    def from_api_response(cls, api_response: dict) -> 'OrderList':
+    def from_api_response(cls, api_response: dict) -> 'OrderList': # O(n)
         """Crea una OrderList directamente desde la respuesta de la API - CORREGIDO"""
         order_list = cls()
         
@@ -189,30 +184,21 @@ class OrderList:
             (255, 100, 255), (100, 255, 255)
         ]
         
-        print(f"📦 PROCESANDO {len(api_response['data'])} PEDIDOS DESDE API:")
-        
+
         for i, order_data in enumerate(api_response['data']):
-            print(f"   Pedido {i+1}: {order_data['id']}")
-            print(f"     Deadline raw: {order_data['deadline']}")
-            
-            # Usar el método corregido de Order para crear el pedido
             order = Order.from_dict(order_data)
-            
-            # Asignar color
             color_index = i % len(job_colors)
             order.color = job_colors[color_index]
-            
             order_list.enqueue(order)
-            print(f"     ✅ Creado: {order.id} - Deadline: {order.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
         
         return order_list
     
     @classmethod
-    def from_list(cls, orders: List[Order]) -> 'OrderList':
+    def from_list(cls, orders: List[Order]) -> 'OrderList': # O(n)
         """Crea una OrderList desde una lista de Orders existente"""
         order_list = cls()
         for order in orders:
-            order_list.enqueue(order)  # Usar enqueue en lugar de append
+            order_list.enqueue(order)
         return order_list
     
     @classmethod

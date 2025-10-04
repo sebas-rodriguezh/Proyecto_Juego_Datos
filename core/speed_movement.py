@@ -2,23 +2,17 @@ class Speed_Movement:
     """Sistema que gestiona la velocidad y movimiento del jugador"""
     
     def __init__(self, velocidad_base: float = 3.0):
-        self.velocidad_base = velocidad_base  # celdas/segundo
+        self.velocidad_base = velocidad_base
         self.estado_resistencia = 0.0    
         self.reputacion_actual = 0.0
         self.peso_total = 0.0
         self.multiplicador_limite = 1.0
         
-        # Definición de pesos de superficie
         self.pesos_superficie = {
             "calle": 1.0,
             "parque": 0.3
         }
         
-        
-        # Mapa y clima
-        
-        
-        # Multiplicadores de resistencia
         self.multiplicadores_resistencia = {
             "normal": 1.0,
             "tired": 0.8,
@@ -41,10 +35,8 @@ class Speed_Movement:
         """Cambia el estado de resistencia del jugador"""
         if estado in self.multiplicadores_resistencia:
             self.estado_resistencia = estado
-            #print(f"Estado resistencia cambiado a: {estado}")  # DEBUG
         else:
-            print(f"ERROR: Estado de resistencia no válido: '{estado}'")  # DEBUG
-            print(f"Estados válidos: {list(self.multiplicadores_resistencia.keys())}")  # DEBUG
+            pass
 
     
     def calcular_multiplicador_peso(self) -> float:
@@ -64,16 +56,14 @@ class Speed_Movement:
         return self.pesos_superficie.get(tipo_superficie, 1.0)
     
     def calcular_velocidad_final(self, tipo_superficie: str) -> float:
-        #Calcula la velocidad final usando la fórmula completa
-
+        """Calcula la velocidad final usando la fórmula completa"""
         try:
-            # Calcular cada componente
             m_peso = self.calcular_multiplicador_peso()
             m_rep = self.calcular_multiplicador_reputacion()
             m_resistencia = self.obtener_multiplicador_resistencia()
             peso_superficie = self.obtener_peso_superficie(tipo_superficie)
             
-            # Aplicar fórmula completa
+            # FORMULA COMPLETA
             velocidad_final = (
                 self.velocidad_base *
                 self.multiplicador_limite *
@@ -83,7 +73,6 @@ class Speed_Movement:
                 peso_superficie
             )
             
-            # Velocidad nunca puede ser negativa
             return max(0.0, velocidad_final)
             
         except Exception as e:
@@ -91,12 +80,10 @@ class Speed_Movement:
             return 0.0
     
     def calcular_tiempo_recorrido(self, distancia_celdas: float, tipo_superficie: str) -> float:
-        """
-        Calcula el tiempo en segundos para recorrer una distancia dada
-        """
+        """Calcula el tiempo en segundos para recorrer una distancia dada"""
         velocidad = self.calcular_velocidad_final(tipo_superficie)
         if velocidad <= 0:
-            return float('inf')  # No se puede mover
+            return float('inf') 
         return distancia_celdas / velocidad
     
     def obtener_estado_movimiento(self, tipo_superficie: str) -> dict:

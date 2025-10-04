@@ -155,7 +155,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=5.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
+            time_scale=3.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
         )
         self.game_time.start()
 

@@ -1,43 +1,33 @@
-# game_state.py - VERSIÓN CORREGIDA SIN BUCLE INFINITO
 import json
 import os
 from datetime import datetime
 
-class GameState:
-    """Gestor del estado global del juego - VERSIÓN CORREGIDA"""
-    
+class GameState:    
+
     def __init__(self):
         self.total_earnings = 0
         self.income_goal = 3000
         self.game_over = False
         self.victory = False
         self.game_over_reason = ""
-        
-        # Estadísticas del juego
         self.orders_completed = 0
         self.orders_cancelled = 0
         self.perfect_deliveries = 0
         self.late_deliveries = 0
-        
-        # Racha de entregas perfectas
         self.current_streak = 0
         self.best_streak = 0
         
-        # Tiempo de juego
         self.start_time = datetime.now()
         self.end_time = None
         
-        # Referencia al jugador
         self.player = None
         
-        # Cache del puntaje final para evitar cálculos repetidos
         self._cached_final_score = None
         self._cached_game_duration = None
     
     def set_player_reference(self, player):
         """Establece referencia al jugador para acceder a la reputación actual"""
         self.player = player
-        # Invalidar cache cuando cambia el jugador
         self._cached_final_score = None
     
     def set_income_goal(self, goal):
@@ -47,7 +37,6 @@ class GameState:
     def add_earnings(self, amount):
         """Añade ganancias al total"""
         self.total_earnings += amount
-        # Invalidar cache cuando cambian las ganancias
         self._cached_final_score = None
     
     def complete_order(self, order, on_time=True, early=False):
@@ -58,16 +47,16 @@ class GameState:
             self.perfect_deliveries += 1
             self.current_streak += 1
             self.best_streak = max(self.best_streak, self.current_streak)
-            print(f"🔍 DEBUG STREAK: Entrega a tiempo - racha: {self.current_streak}")
+            print(f"DEBUG STREAK: Entrega a tiempo - racha: {self.current_streak}")
         elif early:
             self.perfect_deliveries += 1
             self.current_streak += 1
             self.best_streak = max(self.best_streak, self.current_streak)
-            print(f"🔍 DEBUG STREAK: Entrega temprana - racha: {self.current_streak}")
+            print(f"DEBUG STREAK: Entrega temprana - racha: {self.current_streak}")
         else:
             self.late_deliveries += 1
             self.current_streak = 0
-            print(f"🔍 DEBUG STREAK: Entrega tardía - racha rota")
+            print(f"DEBUG STREAK: Entrega tardía - racha rota")
         
         if self.current_streak >= 3:
                 # Solo aplicar el bonus una vez por cada racha de 3
@@ -85,7 +74,6 @@ class GameState:
         """Registra la cancelación de un pedido"""
         self.orders_cancelled += 1
         self.current_streak = 0
-        # Invalidar cache cuando cambian las estadísticas
         self._cached_final_score = None
     
     def set_game_over(self, victory, reason):
@@ -94,7 +82,6 @@ class GameState:
         self.victory = victory
         self.game_over_reason = reason
         self.end_time = datetime.now()
-        # Invalidar cache cuando termina el juego
         self._cached_final_score = None
     
     def calculate_final_score(self, game_duration, total_game_duration=900):
@@ -102,12 +89,11 @@ class GameState:
         if not self.game_over or not self.player:
             return 0
         
-        # Usar cache si ya se calculó con los mismos parámetros
         if (self._cached_final_score is not None and 
             self._cached_game_duration == game_duration):
             return self._cached_final_score
         
-        print(f"🎯 CALCULANDO PUNTAJE FINAL (una sola vez):")
+        print(f"CALCULANDO PUNTAJE FINAL:")
         print(f"   - Reputación final: {self.player.reputation}")
         print(f"   - Ganancias totales: ${self.total_earnings}")
         print(f"   - Duración del juego: {game_duration:.1f}s de {total_game_duration}s")
@@ -138,7 +124,6 @@ class GameState:
         
         print(f"   - PUNTAJE FINAL: ${final_score}")
         
-        # Guardar en cache
         self._cached_final_score = final_score
         self._cached_game_duration = game_duration
         
@@ -152,7 +137,6 @@ class GameState:
     
     def get_game_stats(self, game_duration=0):
         """Retorna estadísticas del juego actual SIN calcular puntaje repetidamente"""
-        # NO llamar a calculate_final_score aquí para evitar bucles
         stats = {
             "earnings": self.total_earnings,
             "goal": self.income_goal,
@@ -168,12 +152,10 @@ class GameState:
             "final_reputation": self.player.reputation if self.player else 0
         }
         
-        # Solo calcular el puntaje final si es necesario y no está en cache
         if self.game_over:
             if self._cached_final_score is not None:
                 stats["final_score"] = self._cached_final_score
             else:
-                # Si no está en cache, calcularlo una sola vez
                 stats["final_score"] = self.calculate_final_score(game_duration)
         else:
             stats["final_score"] = 0
