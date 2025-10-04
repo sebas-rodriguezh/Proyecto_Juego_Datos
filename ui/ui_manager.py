@@ -24,7 +24,6 @@ class UIManager:
         self.message_timer = 0
         self.selected_order = None
         
-        # NUEVO: Control de visibilidad de controles de inventario
         self.show_inventory_controls = False
         self.controls_timer = 0
         self.controls_duration = 5.0  # Segundos que se muestran los controles
@@ -51,7 +50,6 @@ class UIManager:
             if mouse_x > self.game_map.width * self.game_map.tile_size:
                 self.handle_sidebar_click(mouse_x, mouse_y, active_orders, player)
         
-        # NUEVO: Mostrar controles al presionar P o E
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p or event.key == pygame.K_e:
                 self.show_inventory_controls = True
@@ -80,14 +78,14 @@ class UIManager:
         else:
             self.message = ""
         
-        # NUEVO: Actualizar timer de controles
+
         if self.show_inventory_controls:
             self.controls_timer -= dt
             if self.controls_timer <= 0:
                 self.show_inventory_controls = False
     
     def draw_sidebar(self, player, active_orders, weather_system, game_time, game_state, pending_count=0):
-        """Dibuja el panel lateral completo - CORREGIDO"""
+        """Dibuja el panel lateral completo """
         cols = self.game_map.width
         sidebar_rect = pygame.Rect(cols * self.game_map.tile_size, 0, 300, self.screen_height)
         pygame.draw.rect(self.screen, (240, 240, 240), sidebar_rect)
@@ -97,10 +95,9 @@ class UIManager:
         
         x_offset = cols * self.game_map.tile_size
         
-        # Dibujar cada sección - CORREGIDO: pasar game_time al draw_inventory
         self.draw_header(cols, game_time, game_state)
         self.draw_player_status(cols, player)
-        self.draw_inventory(cols, player, game_time)  # ← ¡PASAR game_time!
+        self.draw_inventory(cols, player, game_time)  
         self.draw_weather_info(cols, weather_system, player)
         self.draw_available_jobs(cols, active_orders, weather_system, player, pending_count)
         
@@ -114,7 +111,7 @@ class UIManager:
     
     def draw_inventory_controls_popup(self):
         """Dibuja un popup emergente con los controles de inventario en esquina inferior izquierda"""
-        # Posición en esquina inferior izquierda (fuera del sidebar)
+        # Posición en esquina inferior izquierda 
         popup_width = 280
         popup_height = 70
         popup_x = 10  # Esquina izquierda
@@ -134,7 +131,6 @@ class UIManager:
         title = self.font_medium.render("🎮 CONTROLES INVENTARIO", True, (0, 100, 0))
         self.screen.blit(title, (popup_x + 10, popup_y + 5))
         
-        # Controles (cambiado D por E)
         controls = [
             "P: Ordenar por Prioridad",
             "O: Ordenar por Urgencia (Deadline)"
@@ -151,14 +147,13 @@ class UIManager:
         self.screen.blit(hint_text, (10, self.screen_height - 20))
     
     def draw_header(self, cols, game_time, game_state):
-        """Dibuja el encabezado con título, tiempo y ganancias - SOLO AGREGAR HORA"""
+        """Dibuja el encabezado con título, tiempo y ganancias"""
         x_offset = cols * self.game_map.tile_size
         
         # Título
         title = self.font_large.render("Courier Quest", True, (0, 0, 0))
         self.screen.blit(title, (x_offset + 10, 10))
         
-        # ⏰ NUEVO: HORA DEL JUEGO (esquina superior derecha) - SOLO ESTA LÍNEA NUEVA
         game_time_text = self.font_medium.render(f"HORA ACTUAL: {game_time.get_game_time_formatted()}", True, (0, 100, 150))
         time_text_width = game_time_text.get_width()
         self.screen.blit(game_time_text, (x_offset + 280 - time_text_width, 12))
@@ -177,14 +172,14 @@ class UIManager:
         else:
             time_color = (0, 100, 0)
         
-        time_text = self.font_medium.render(f"⏰ Tiempo: {game_time.get_remaining_time_formatted()}", True, time_color)
+        time_text = self.font_medium.render(f" Tiempo: {game_time.get_remaining_time_formatted()}", True, time_color)
         self.screen.blit(time_text, (x_offset + 20, 38))
         
         # Ganancias y meta
-        earnings_text = self.font_medium.render(f"💰 Ganancias: ${game_state.total_earnings}", True, (0, 100, 0))
+        earnings_text = self.font_medium.render(f" Ganancias: ${game_state.total_earnings}", True, (0, 100, 0))
         self.screen.blit(earnings_text, (x_offset + 10, 65))
         
-        goal_text = self.font_small.render(f"🎯 Meta: ${game_state.income_goal}", True, (0, 0, 0))
+        goal_text = self.font_small.render(f" Meta: ${game_state.income_goal}", True, (0, 0, 0))
         self.screen.blit(goal_text, (x_offset + 150, 65))
 
     def draw_player_status(self, cols, player):
@@ -228,51 +223,6 @@ class UIManager:
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height))
         pygame.draw.rect(self.screen, color, (x, y, width * progress, height))
     
-    # def draw_inventory(self, cols, player):
-    #     """Dibuja el inventario mostrando prioridades"""
-    #     x_offset = cols * self.game_map.tile_size
-        
-    #     inventory_title = self.font_medium.render("Inventario:", True, (0, 0, 0))
-    #     self.screen.blit(inventory_title, (x_offset + 10, 210))
-        
-    #     if player.inventory:
-    #         for i, order in enumerate(player.inventory):
-    #             y_pos = 235 + i * 45
-                
-    #             # Usar el color original del pedido (mismo que en el mapa)
-    #             bg_color = order.color
-                
-    #             # Ajustar el color de fondo para que sea más claro (mejor contraste con texto)
-    #             light_bg_color = (
-    #                 min(255, bg_color[0] + 50),
-    #                 min(255, bg_color[1] + 50), 
-    #                 min(255, bg_color[2] + 50)
-    #             )
-                
-    #             # Determinar color de borde basado en prioridad
-    #             if order.priority > 0:
-    #                 border_color = (200, 0, 0)   # Rojo para prioritarios
-    #                 priority_icon = "🚨 "  # Icono de alerta
-    #             else:
-    #                 border_color = (0, 150, 0)   # Verde para normales
-    #                 priority_icon = ""           # Sin icono
-                
-    #             # Dibujar caja de inventario
-    #             pygame.draw.rect(self.screen, light_bg_color, (x_offset + 10, y_pos, 280, 40))
-    #             pygame.draw.rect(self.screen, border_color, (x_offset + 10, y_pos, 280, 40), 2)
-                
-    #             # Información del pedido
-    #             order_text = f"{priority_icon}{order.id}"
-    #             order_surface = self.font_small.render(order_text, True, (0, 0, 0))
-    #             self.screen.blit(order_surface, (x_offset + 15, y_pos + 5))
-                
-    #             # Información adicional
-    #             info_text = f"P:{order.priority} | ${order.payout} | {order.weight} kg | {order.deadline.strftime('%H:%M')}"
-    #             info_surface = self.font_small.render(info_text, True, (80, 80, 80))
-    #             self.screen.blit(info_surface, (x_offset + 15, y_pos + 20))
-    #     else:
-    #         no_items = self.font_small.render("No hay pedidos en inventario", True, (150, 150, 150))
-    #         self.screen.blit(no_items, (x_offset + 15, 235))
 
     def draw_inventory(self, cols, player, game_time=None):
         """Dibuja el inventario mostrando colores originales y tiempo restante"""
@@ -285,17 +235,15 @@ class UIManager:
             for i, order in enumerate(player.inventory):
                 y_pos = 235 + i * 45
                 
-                # ✅ Usar el color original del pedido
+
                 bg_color = order.color
                 
-                # Ajustar el color de fondo para que sea más claro (mejor contraste con texto)
                 light_bg_color = (
                     min(255, bg_color[0] + 50),
                     min(255, bg_color[1] + 50), 
                     min(255, bg_color[2] + 50)
                 )
                 
-                # ✅ CALCULAR TIEMPO RESTANTE (se mantiene esta funcionalidad)
                 if game_time:
                     current_time = game_time.get_current_game_time()
                     time_remaining = order.get_time_remaining(current_time)
@@ -388,7 +336,7 @@ class UIManager:
         
         # Mostrar contador de pedidos pendientes
         if pending_count > 0:
-            pending_text = self.font_small.render(f"⏰ {pending_count} pedidos pendientes...", 
+            pending_text = self.font_small.render(f" {pending_count} pedidos pendientes...", 
                                             True, (100, 100, 100))
             self.screen.blit(pending_text, (x_offset + 10, jobs_y_pos + 25 + len(active_orders) * 70))
 
@@ -409,14 +357,14 @@ class UIManager:
             self.screen.blit(name, (x_offset + 30, y_pos))
             y_pos += 20
     
-    # ui_manager.py - MODIFICAR draw_order_markers
+
     def draw_order_markers(self, active_orders, player, camera_x, camera_y):
         """Dibuja los marcadores de trabajos en el mapa - INCLUYE PEDIDOS EN INVENTARIO"""
-        # Dibujar marcadores para órdenes activas (no recogidas)
+
         for order in active_orders:
             self.draw_single_order_marker(order, player, camera_x, camera_y, False)
         
-        # NUEVO: Dibujar marcadores para pedidos en inventario (solo punto de entrega)
+
         for order in player.inventory:
             self.draw_single_order_marker(order, player, camera_x, camera_y, True)
 
@@ -440,10 +388,9 @@ class UIManager:
                             pickup_y * self.game_map.tile_size + self.game_map.tile_size // 2 - camera_y), 
                             7, 1)
         
-        # SIEMPRE dibujar punto de entrega (incluso para pedidos en inventario)
         dropoff_x, dropoff_y = order.dropoff
         if in_inventory:
-            # Si está en inventario, dibujar con borde más grueso
+            
             pygame.draw.rect(self.screen, color, 
                         (dropoff_x * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_x, 
                         dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
@@ -463,7 +410,7 @@ class UIManager:
                         dropoff_y * self.game_map.tile_size + self.game_map.tile_size // 2 - 5 - camera_y, 
                         10, 10), 1)
         
-        # Dibujar línea conectando recogida y entrega SOLO si NO está en inventario
+
         if not in_inventory:
             pickup_x, pickup_y = order.pickup
             pygame.draw.line(self.screen, color, 
@@ -480,15 +427,14 @@ class UIManager:
             self.screen.blit(msg_surface, (10, 10))
     
     def get_interaction_hint(self, game_map):
-        """Obtiene pista de interacción - NUEVO MÉTODO"""
-        # Este método debería llamar al interaction_manager.get_interaction_hint()
+        """Obtiene pista de interacción"""
         if hasattr(self, 'interaction_manager'):
             return self.interaction_manager.get_interaction_hint(game_map)
         return ""
 
     # ui_manager.py - CORREGIR método draw_interaction_hints
     def draw_interaction_hints(self, player, active_orders, camera_x, camera_y, game_map=None):
-        """Dibuja pistas de interacción cerca del jugador - SIMPLIFICADO"""
+        """Dibuja pistas de interacción cerca del jugador"""
         if hasattr(self, 'interaction_manager') and hasattr(self.interaction_manager, 'game_time'):
             game_time = self.interaction_manager.game_time
         else:
@@ -503,7 +449,6 @@ class UIManager:
             order_info = interaction['order']
             action = interaction['action']
             
-            # ✅ TEXTO SIMPLE: Solo "Recoger/Entregar + ID"
             if action == 'pickup':
                 hint_text = f"Recoger {order_info.id}"
             else:  # dropoff
@@ -512,7 +457,7 @@ class UIManager:
             # Usar la posición del punto de interacción
             loc_x, loc_y = interaction['location']
             
-            # ✅ FUENTE MÁS GRANDE Y LEGIBLE
+
             hint_text_surface = self.font_medium.render(hint_text, True, (0, 0, 0))  # Texto negro
             text_width = hint_text_surface.get_width()
             text_height = hint_text_surface.get_height()
@@ -526,7 +471,6 @@ class UIManager:
                 text_height + padding * 2
             )
             
-            # Color del pedido (fondo más claro para mejor contraste)
             hint_color = order_info.color
             light_bg_color = (
                 min(255, hint_color[0] + 80),

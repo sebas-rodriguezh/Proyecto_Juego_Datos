@@ -8,9 +8,8 @@ class OrderPopupManager:
         self.screen_width = screen_width
         self.screen_height = screen_height
         
-        self.game_engine = None  # Se establecerá después
-        # Estado del popup de nuevo pedido
-        self.pending_order = None  # Pedido esperando respuesta
+        self.game_engine = None  
+        self.pending_order = None  
         self.popup_timer = 0
         self.popup_duration = 30.0 
         self.popup_active = False
@@ -35,27 +34,25 @@ class OrderPopupManager:
     
     def show_new_order_popup(self, order):
         """Muestra popup para aceptar/rechazar un nuevo pedido"""
-        if not self.popup_active:  # Solo mostrar si no hay otro popup activo
+        if not self.popup_active:  
             self.pending_order = order
             self.popup_timer = self.popup_duration
             self.popup_active = True
-            print(f"🔔 Mostrando popup para pedido: {order.id}")
+            print(f" Mostrando popup para pedido: {order.id}")
     
     def show_cancel_order_popup(self, order):
         """Muestra popup para confirmar cancelación de pedido"""
         if not self.cancel_popup_active:
             self.selected_order_for_cancel = order
             self.cancel_popup_active = True
-            print(f"⚠️ Mostrando popup de cancelación para: {order.id}")
+            print(f" Mostrando popup de cancelación para: {order.id}")
     
     def handle_event(self, event, game_engine, player, active_orders):
-        """Maneja eventos relacionados con los popups - VERSIÓN CORREGIDA"""
+        """Maneja eventos relacionados con los popups """
         result = None
         
         if event.type == pygame.KEYDOWN:
-            # ✅ CORRECCIÓN: No procesar ESC aquí si está en popup, dejar que game_engine lo maneje
             if event.key == pygame.K_ESCAPE:
-                # ESC se maneja en game_engine para evitar conflictos
                 return None
                 
             # Popup de nuevo pedido
@@ -63,12 +60,11 @@ class OrderPopupManager:
                 if event.key == pygame.K_y:  # Aceptar pedido
                     result = self.accept_order(game_engine.game_state, player, active_orders)
                 elif event.key == pygame.K_n:  # Rechazar pedido
-                    result = self.reject_order(game_engine)  # Pasar game_engine completo
+                    result = self.reject_order(game_engine)
             
             # Popup de cancelación
             elif self.cancel_popup_active and self.selected_order_for_cancel:
                 if event.key == pygame.K_y:  # Confirmar cancelación
-                    # ✅ CORRECCIÓN: Pasar game_state en lugar de game_engine
                     result = self.confirm_cancel_order(game_engine.game_state, player)
                 elif event.key == pygame.K_n:  # No cancelar
                     self.cancel_popup_active = False
@@ -85,7 +81,6 @@ class OrderPopupManager:
             
             # Clicks en popup de cancelación
             elif self.cancel_popup_active:
-                # ✅ CORRECCIÓN: Pasar game_state en lugar de game_engine
                 cancel_result = self.handle_cancel_popup_click(mouse_x, mouse_y, game_engine.game_state, player)
                 if cancel_result:
                     result = cancel_result
@@ -168,7 +163,7 @@ class OrderPopupManager:
             }
         else:
             # No puede aceptar por capacidad
-            print(f"❌ No se puede aceptar {order.id} - Sin capacidad")
+            print(f" No se puede aceptar {order.id} - Sin capacidad")
             return {
                 "type": "accept_order", 
                 "result": "no_capacity", 
@@ -183,11 +178,9 @@ class OrderPopupManager:
         
         order = self.pending_order
         
-        # ✅ CORRECCIÓN CRÍTICA: Registrar como cancelación en game_state
         game_engine.game_state.orders_cancelled += 1
-        game_engine.game_state.current_streak = 0  # Resetear racha
+        game_engine.game_state.current_streak = 0  
         
-        # Añadir a la lista de pedidos rechazados del game_engine
         if hasattr(game_engine, 'rejected_orders'):
             game_engine.rejected_orders.enqueue(order)
             print(f"📝 Pedido {order.id} añadido a rechazados. Total: {len(game_engine.rejected_orders)}")
@@ -198,7 +191,7 @@ class OrderPopupManager:
         self.popup_active = False
         self.pending_order = None
         
-        print(f"❌ Pedido {order.id} RECHAZADO")
+        print(f" Pedido {order.id} RECHAZADO")
         return {
             "type": "reject_order", 
             "result": "rejected", 
@@ -233,7 +226,7 @@ class OrderPopupManager:
                 "result": "confirmed", 
                 "order": order,
                 "message": f"Pedido {order.id} cancelado (-4 reputación)",
-                "penalty": 4  # Añadir penalización para aplicar después
+                "penalty": 4  
             }
         
         else:
@@ -247,19 +240,19 @@ class OrderPopupManager:
     
     def update(self, dt):
         """Actualiza los timers de los popups"""
-        # Timer del popup de nuevo pedido
+        
         if self.popup_active and self.popup_timer > 0:
             self.popup_timer -= dt
             if self.popup_timer <= 0:
-                # Auto-rechazar si se acaba el tiempo
+                
                 print(f"⏰ Tiempo agotado para {self.pending_order.id} - Auto-rechazando")
-                # CORREGIR: Pasar game_engine en lugar de None
-                self.reject_order(self.game_engine)  # Auto-rechazar
+                
+                self.reject_order(self.game_engine)  
     
     def get_popup_position(self):
         """Calcula la posición del popup de nuevo pedido"""
         popup_width, popup_height = 280, 150
-        # Posición en esquina inferior derecha
+
         popup_x = self.screen_width - popup_width - 10
         popup_y = self.screen_height - popup_height - 10
         return popup_x, popup_y
@@ -273,15 +266,15 @@ class OrderPopupManager:
         popup_x, popup_y = self.get_popup_position()
         popup_width, popup_height = 280, 150
         
-        # Fondo del popup con transparencia
+       
         popup_surface = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
         
-        # Color de fondo basado en prioridad
+        
         if order.priority > 0:
-            bg_color = (255, 200, 200, 240)  # Rojo claro para prioritarios
+            bg_color = (255, 200, 200, 240)  
             border_color = (255, 0, 0)
         else:
-            bg_color = (200, 200, 255, 240)  # Azul claro para normales
+            bg_color = (200, 200, 255, 240)  
             border_color = (0, 0, 200)
         
         popup_surface.fill(bg_color)

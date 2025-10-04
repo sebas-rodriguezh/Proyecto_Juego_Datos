@@ -1,4 +1,4 @@
-# save_load_manager.py - VERSIÓN MEJORADA
+
 import json
 import os
 from datetime import datetime
@@ -7,7 +7,7 @@ import pickle
 import base64
 
 class SaveLoadManager:
-    """Sistema de guardado y carga del juego - VERSIÓN MEJORADA"""
+    """Sistema de guardado y carga del juego """
     
     SAVE_DIR = "saves"
     
@@ -15,18 +15,18 @@ class SaveLoadManager:
         os.makedirs(self.SAVE_DIR, exist_ok=True)
     
     def save_game(self, game_engine, slot_name="slot1"):
-        """Guarda el estado completo del juego como binario - MEJORADO"""
+        """Guarda el estado completo del juego como binario"""
         try:
             # Crear datos de guardado COMPLETOS
             save_data = {
-                "version": "2.2",  # Incrementar versión
+                "version": "2.2",  
                 "timestamp": datetime.now().isoformat(),
                 "player_data": self._serialize_player(game_engine.player),
                 "active_orders": self._serialize_order_list(game_engine.active_orders),
                 "completed_orders": self._serialize_order_list(game_engine.completed_orders),
                 "pending_orders": self._serialize_order_list(game_engine.pending_orders),
                 "rejected_orders": self._serialize_order_list(game_engine.rejected_orders),
-                "all_orders": self._serialize_order_list(game_engine.all_orders),  # ✅ NUEVO: Guardar todos los pedidos
+                "all_orders": self._serialize_order_list(game_engine.all_orders),  
                 "game_state": self._serialize_game_state(game_engine.game_state),
                 "game_time": self._serialize_game_time(game_engine.game_time),
                 "weather_state": self._serialize_weather(game_engine.weather_system),
@@ -40,13 +40,13 @@ class SaveLoadManager:
                 }
             }
             
-            # Guardar como binario usando pickle
+            
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             with open(save_file, "wb") as f:
                 pickle.dump(save_data, f)
             
-            print(f"✅ Partida guardada correctamente en {save_file}")
-            print(f"📊 Estadísticas de guardado:")
+            print(f" Partida guardada correctamente en {save_file}")
+            print(f" Estadísticas de guardado:")
             print(f"   - Pedidos activos: {len(game_engine.active_orders)}")
             print(f"   - Pedidos en inventario: {len(game_engine.player.inventory)}")
             print(f"   - Pedidos pendientes: {len(game_engine.pending_orders)}")
@@ -55,7 +55,7 @@ class SaveLoadManager:
             return True
             
         except Exception as e:
-            print(f"❌ Error al guardar: {e}")
+            print(f" Error al guardar: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -66,14 +66,14 @@ class SaveLoadManager:
             save_file = os.path.join(self.SAVE_DIR, f"{slot_name}.sav")
             
             if not os.path.exists(save_file):
-                print(f"❌ No se encontró archivo de guardado: {save_file}")
+                print(f" No se encontró archivo de guardado: {save_file}")
                 return None
             
             with open(save_file, "rb") as f:
                 save_data = pickle.load(f)
             
-            print(f"✅ Partida cargada desde {save_file}")
-            print(f"📊 Datos cargados:")
+            print(f" Partida cargada desde {save_file}")
+            print(f" Datos cargados:")
             print(f"   - Pedidos activos: {len(save_data.get('active_orders', []))}")
             print(f"   - Pedidos en inventario: {len(save_data.get('player_data', {}).get('inventory', []))}")
             print(f"   - Pedidos pendientes: {len(save_data.get('pending_orders', []))}")
@@ -83,13 +83,13 @@ class SaveLoadManager:
             return save_data
             
         except Exception as e:
-            print(f"❌ Error al cargar: {e}")
+            print(f" Error al cargar: {e}")
             import traceback
             traceback.print_exc()
             return None
 
     def _serialize_player(self, player):
-        """Serializa el estado del jugador - MEJORADO"""
+        """Serializa el estado del jugador"""
         try:
             player_data = {
                 "grid_x": player.grid_x,
@@ -103,7 +103,7 @@ class SaveLoadManager:
                 "completed_orders": self._serialize_order_list(player.completed_orders)
             }
             
-            print(f"💾 Serializando jugador:")
+            print(f" Serializando jugador:")
             print(f"   - Posición: ({player.grid_x}, {player.grid_y})")
             print(f"   - Inventario: {len(player.inventory)} pedidos")
             print(f"   - Peso actual: {player.current_weight}kg")
@@ -123,9 +123,9 @@ class SaveLoadManager:
                 "completed_orders": []
             }
             
-# Agregar este método en la clase SaveLoadManager (después de _serialize_player)
+
     def _serialize_game_state(self, game_state):
-        """Serializa el estado del juego - NUEVO MÉTODO"""
+        """Serializa el estado del juego"""
         try:
             game_state_data = {
                 "total_earnings": game_state.total_earnings,
@@ -142,7 +142,7 @@ class SaveLoadManager:
                 "start_time": game_state.start_time.isoformat() if hasattr(game_state.start_time, 'isoformat') else str(game_state.start_time)
             }
             
-            print(f"💾 Serializando game_state: ${game_state_data['total_earnings']} ganancias")
+            print(f" Serializando game_state: ${game_state_data['total_earnings']} ganancias")
             return game_state_data
             
         except Exception as e:
@@ -163,21 +163,20 @@ class SaveLoadManager:
             }
     
     def _serialize_order_list(self, order_list):
-        """Serializa una OrderList - VERSIÓN COMPATIBLE CON Z"""
+        """Serializa una OrderList"""
         orders_data = []
         try:
             for order in order_list:
-                # Convertir deadline a string sin Z
                 deadline_str = order.deadline.isoformat()
                 if not deadline_str.endswith('Z'):
-                    deadline_str = deadline_str  # Ya está bien
+                    deadline_str = deadline_str  
                 
                 order_data = {
                     "id": order.id,
                     "pickup": order.pickup,
                     "dropoff": order.dropoff,
                     "payout": order.payout,
-                    "deadline": deadline_str,  # Sin Z para compatibilidad interna
+                    "deadline": deadline_str, 
                     "weight": order.weight,
                     "priority": order.priority,
                     "release_time": order.release_time,
@@ -189,7 +188,7 @@ class SaveLoadManager:
                 }
                 orders_data.append(order_data)
                 
-            print(f"💾 Serializando {len(orders_data)} órdenes")
+            print(f" Serializando {len(orders_data)} órdenes")
             
         except Exception as e:
             print(f"Error serializando órdenes: {e}")
@@ -198,7 +197,7 @@ class SaveLoadManager:
         return orders_data
 
     def _serialize_game_time(self, game_time):
-        """Serializa el tiempo de juego - MEJORADO"""
+        """Serializa el tiempo de juego"""
         try:
             return {
                 "elapsed_time_sec": game_time.get_elapsed_real_time(),
@@ -235,9 +234,9 @@ class SaveLoadManager:
                 "current_multiplier": 1.0
             }
     
-    # En el método list_saves(), mejora la información:
+    
     def list_saves(self):
-        """Lista todas las partidas guardadas disponibles - MEJORADO"""
+        """Lista todas las partidas guardadas disponibles"""
         saves = {}
         
         for i in range(1, 4):  # 3 slots de guardado
@@ -249,7 +248,6 @@ class SaveLoadManager:
                     with open(save_file, "rb") as f:
                         save_data = pickle.load(f)
                     
-                    # Extraer información mejorada
                     game_state = save_data.get("game_state", {})
                     player_data = save_data.get("player_data", {})
                     

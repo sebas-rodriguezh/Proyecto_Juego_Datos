@@ -1,4 +1,4 @@
-# pause_menu.py - NUEVO ARCHIVO para menú de pausa
+
 import pygame
 
 class PauseMenu:
@@ -87,7 +87,6 @@ class PauseMenu:
                         return None
                     else:
                         return {"action": action}
-                # ✅ CORRECCIÓN: ESC siempre cierra el menú de pausa
                 elif event.key == pygame.K_ESCAPE:
                     return {"action": "resume"}
         

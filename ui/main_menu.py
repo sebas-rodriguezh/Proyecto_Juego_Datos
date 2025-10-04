@@ -1,4 +1,4 @@
-# main_menu.py - MEJORADO PARA MANEJAR EVENTOS Y GUARDADO/CARGA
+
 import pygame
 import sys
 from utils.save_load_manager import SaveLoadManager
@@ -62,15 +62,12 @@ class MainMenu:
         background = pygame.Surface((self.width, self.height))
         background.fill((30, 30, 60))  # Fondo azul oscuro
         
-        # Añadir patrones o gradientes al fondo
         for i in range(0, self.width, 20):
             pygame.draw.line(background, (50, 50, 100), (i, 0), (i, self.height), 1)
         for i in range(0, self.height, 20):
             pygame.draw.line(background, (50, 50, 100), (0, i), (self.width, i), 1)
         
         return background
-    
-# main_menu.py - AGREGAR ESTE MÉTODO Y MODIFICAR handle_events
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -91,7 +88,7 @@ class MainMenu:
                     elif event.key == pygame.K_ESCAPE:
                         self.show_save_slots = False
                         self.selected_save_slot = None
-                elif self.show_high_scores:  # ← NUEVO: Manejar pantalla de puntuaciones
+                elif self.show_high_scores: 
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         self.show_high_scores = False
                 else:
@@ -105,7 +102,7 @@ class MainMenu:
                         if action == "load_game":
                             self.show_save_slots = True
                             self.selected_save_slot = 0
-                        elif action == "high_scores":  # ← NUEVO: Mostrar puntuaciones
+                        elif action == "high_scores":
                             self.show_high_scores = True
                         else:
                             return action
@@ -119,7 +116,7 @@ class MainMenu:
         self.screen.blit(self.background, (0, 0))
         
         if self.show_high_scores:
-            self.draw_high_scores()  # ← NUEVO
+            self.draw_high_scores()
         elif self.show_save_slots:
             self.draw_save_slots()
         else:
@@ -139,13 +136,13 @@ class MainMenu:
         subtitle = self.font_small.render("Sistema de Entregas", True, (200, 200, 200))
         self.screen.blit(subtitle, (self.width // 2 - subtitle.get_width() // 2, 160))
         
-        # Dibujar opciones del menú
+       
         for i, option in enumerate(self.options):
             if i == self.selected_option:
-                color = (255, 215, 0)  # Dorado para la opción seleccionada
+                color = (255, 215, 0)  
                 text = self.font_medium.render("> " + option["text"] + " <", True, color)
             else:
-                color = (200, 200, 200)  # Gris claro para opciones no seleccionadas
+                color = (200, 200, 200)  
                 text = self.font_medium.render(option["text"], True, color)
             
             y_pos = 250 + i * 60
@@ -179,7 +176,7 @@ class MainMenu:
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
         
 
-    # Agregar este método para cargar puntuaciones
+
     def load_high_scores(self):
         """Carga las puntuaciones desde el archivo"""
         try:
@@ -189,7 +186,6 @@ class MainMenu:
         except:
             return []
 
-    # Agregar método para dibujar pantalla de puntuaciones
     def draw_high_scores(self):
         """Dibuja la pantalla de puntuaciones altas"""
         # Fondo
@@ -226,7 +222,7 @@ class MainMenu:
                 self.screen.blit(pos_text, (x_pos, y_pos))
                 x_pos += col_widths[0]
                 
-                # Nombre del jugador
+                
                 name_text = self.font_small.render(score.get("player_name", "Jugador"), True, (255, 255, 255))
                 self.screen.blit(name_text, (x_pos, y_pos))
                 x_pos += col_widths[1]
@@ -241,7 +237,7 @@ class MainMenu:
                 self.screen.blit(earnings_text, (x_pos, y_pos))
                 x_pos += col_widths[3]
                 
-                # Fecha (formateada)
+                # Fecha 
                 date_str = score.get("date", "")
                 if date_str:
                     try:
@@ -260,9 +256,4 @@ class MainMenu:
         instructions = self.font_small.render("Presiona ESC o ENTER para volver", True, (150, 150, 150))
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
 
-# Este código solo se ejecuta si el archivo se ejecuta directamente
-if __name__ == "__main__":
-    print("⚠️  Este archivo no debe ejecutarse directamente.")
-    print("💡 Ejecuta 'main.py' en su lugar.")
-    pygame.quit()
-    sys.exit(1)
+

@@ -1,4 +1,4 @@
-# undo_stack.py - VERSIÓN OPTIMIZADA
+
 from collections import deque
 from datetime import datetime
 import copy
@@ -7,10 +7,10 @@ class GameStateSnapshot:
     """Snapshot del estado del juego para undo/redo"""
     
     def __init__(self, player_pos, player_stats, earnings, inventory_ids, timestamp=None):
-        self.player_pos = player_pos  # (grid_x, grid_y)
-        self.player_stats = player_stats  # {'stamina': x, 'reputation': y, 'weight': z}
+        self.player_pos = player_pos  
+        self.player_stats = player_stats  
         self.earnings = earnings
-        self.inventory_ids = inventory_ids[:]  # Lista de IDs de órdenes en inventario
+        self.inventory_ids = inventory_ids[:] 
         self.timestamp = timestamp or datetime.now()
     
     def __str__(self):
@@ -74,13 +74,13 @@ class UndoStack:
         return len(self._undo_stack)
 
 class UndoRedoManager:
-    """Manager que integra el UndoStack con el juego - OPTIMIZADO"""
+    """Manager que integra el UndoStack con el juego"""
     
     def __init__(self, max_states=10):
         self.undo_stack = UndoStack(max_states)
         self.last_save_time = 0
-        self.save_interval = 2.0  # Guardar cada 2 segundos para reducir spam
-        self.last_position = None  # Optimización: solo guardar si cambió posición
+        self.save_interval = 2.0  
+        self.last_position = None 
     
     def should_save_state(self, current_time, force_save=False):
         """Determina si debería guardar el estado actual"""
@@ -89,10 +89,9 @@ class UndoRedoManager:
         return (current_time - self.last_save_time) > self.save_interval
     
     def save_game_state(self, game_engine, force=False):
-        """Captura y guarda el estado actual del juego - OPTIMIZADO"""
+        """Captura y guarda el estado actual del juego"""
         current_time = datetime.now().timestamp()
         
-        # Optimización: solo guardar si el jugador cambió de posición
         current_pos = (game_engine.player.grid_x, game_engine.player.grid_y)
         if not force and self.last_position == current_pos:
             return False
@@ -101,10 +100,8 @@ class UndoRedoManager:
             return False
         
         try:
-            # Capturar posición del jugador
             player_pos = current_pos
             
-            # Capturar stats del jugador
             player_stats = {
                 'stamina': round(game_engine.player.stamina, 1),  # Redondear para reducir variaciones
                 'reputation': game_engine.player.reputation,
@@ -134,7 +131,6 @@ class UndoRedoManager:
             return True
             
         except Exception as e:
-            # Silenciar errores para no spam
             return False
     
     def undo_last_action(self, game_engine):
@@ -167,7 +163,6 @@ class UndoRedoManager:
             # Restaurar stats del jugador
             game_engine.player.stamina = snapshot.player_stats['stamina']
             game_engine.player.reputation = snapshot.player_stats['reputation']
-            #game_engine.player.current_weight = snapshot.player_stats['current_weight']
             game_engine.player.state = snapshot.player_stats['state']
             
             # Restaurar earnings

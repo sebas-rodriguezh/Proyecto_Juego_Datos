@@ -1,11 +1,11 @@
-# score_manager.py - VERSIÓN CORREGIDA Y MEJORADA
+
 import json
 import os
 from datetime import datetime
 from typing import List, Dict, Any
 
 class ScoreManager:
-    """Gestor de puntajes del juego Courier Quest - VERSIÓN CORREGIDA"""
+    """Gestor de puntajes del juego Courier Quest"""
     
     def __init__(self, filename="data/puntajes.json"):
         self.filename = filename
@@ -17,12 +17,12 @@ class ScoreManager:
         """Asegura que el directorio data existe"""
         try:
             os.makedirs("data", exist_ok=True)
-            print("✅ Directorio 'data' verificado/creado")
+            print(" Directorio 'data' verificado/creado")
         except Exception as e:
-            print(f"❌ Error creando directorio data: {e}")
+            print(f" Error creando directorio data: {e}")
     
     def initialize_score_system(self) -> bool:
-        """Inicializa el sistema de puntuación - MÉTODO ROBUSTO"""
+        """Inicializa el sistema de puntuación"""
         try:
             if self.initialized:
                 return True
@@ -43,21 +43,21 @@ class ScoreManager:
             self.load_scores()
             
             self.initialized = True
-            print(f"✅ Sistema de puntuación inicializado. {len(self.scores)} puntuaciones cargadas")
+            print(f" Sistema de puntuación inicializado. {len(self.scores)} puntuaciones cargadas")
             return True
             
         except Exception as e:
-            print(f"❌ Error crítico inicializando sistema de puntuación: {e}")
+            print(f" Error crítico inicializando sistema de puntuación: {e}")
             import traceback
             traceback.print_exc()
             return False
     
     def load_scores(self) -> None:
-        """Carga los puntajes desde el archivo JSON - VERSIÓN ROBUSTA"""
+        """Carga los puntajes desde el archivo JSON"""
         try:
             if not os.path.exists(self.filename):
                 self.scores = []
-                print("⚠️ Archivo de puntuaciones no existe, usando lista vacía")
+                print(" Archivo de puntuaciones no existe, usando lista vacía")
                 return
             
             with open(self.filename, 'r', encoding='utf-8') as f:
@@ -65,22 +65,22 @@ class ScoreManager:
             
             if not content:
                 self.scores = []
-                print("⚠️ Archivo de puntuaciones vacío")
+                print(" Archivo de puntuaciones vacío")
             else:
                 self.scores = json.loads(content)
                 if not isinstance(self.scores, list):
-                    print("⚠️ Formato inválido, reiniciando puntuaciones")
+                    print(" Formato inválido, reiniciando puntuaciones")
                     self.scores = []
                 else:
-                    print(f"📊 {len(self.scores)} puntuaciones cargadas correctamente")
+                    print(f" {len(self.scores)} puntuaciones cargadas correctamente")
                     
         except json.JSONDecodeError as e:
-            print(f"❌ Error de formato JSON: {e}")
-            print("🔄 Creando nuevo archivo de puntuaciones...")
+            print(f" Error de formato JSON: {e}")
+            print(" Creando nuevo archivo de puntuaciones...")
             self.scores = []
             self._create_initial_file()
         except Exception as e:
-            print(f"❌ Error cargando puntuaciones: {e}")
+            print(f" Error cargando puntuaciones: {e}")
             self.scores = []
     
     def _create_initial_file(self):
@@ -88,15 +88,15 @@ class ScoreManager:
         try:
             with open(self.filename, 'w', encoding='utf-8') as f:
                 json.dump([], f, indent=2, ensure_ascii=False)
-            print("📄 Archivo de puntuaciones inicial creado exitosamente")
+            print(" Archivo de puntuaciones inicial creado exitosamente")
         except Exception as e:
-            print(f"❌ Error creando archivo de puntuaciones: {e}")
+            print(f" Error creando archivo de puntuaciones: {e}")
     
     def save_scores(self) -> bool:
         """Guarda los puntajes en el archivo JSON"""
         try:
             if not self.initialized:
-                print("⚠️ Sistema no inicializado, inicializando...")
+                print(" Sistema no inicializado, inicializando...")
                 self.initialize_score_system()
             
             self._ensure_data_directory()
@@ -104,46 +104,46 @@ class ScoreManager:
             with open(self.filename, 'w', encoding='utf-8') as f:
                 json.dump(self.scores, f, indent=2, ensure_ascii=False)
             
-            print(f"💾 {len(self.scores)} puntuaciones guardadas correctamente")
+            print(f" {len(self.scores)} puntuaciones guardadas correctamente")
             return True
             
         except Exception as e:
-            print(f"❌ Error guardando puntuaciones: {e}")
+            print(f" Error guardando puntuaciones: {e}")
             return False
     
     def add_score(self, game_state, victory: bool, game_duration: float, total_game_duration: float = 900, player_name: str = "Jugador") -> bool:
-        """Añade un nuevo puntaje desde GameState - VERSIÓN FUNCIONAL"""
+        """Añade un nuevo puntaje desde GameState"""
         try:
-            print(f"🎯 Iniciando guardado de puntuación...")
+            print(f" Iniciando guardado de puntuación...")
             
             # 1. Verificar inicialización del sistema
             if not self.initialized:
-                print("🔄 Sistema no inicializado, inicializando...")
+                print(" Sistema no inicializado, inicializando...")
                 if not self.initialize_score_system():
-                    print("❌ No se pudo inicializar el sistema de puntuación")
+                    print(" No se pudo inicializar el sistema de puntuación")
                     return False
             
             # 2. Validaciones del estado del juego
             if not game_state:
-                print("❌ game_state es None")
+                print(" game_state es None")
                 return False
                 
             if not hasattr(game_state, 'game_over'):
-                print("❌ game_state no tiene atributo game_over")
+                print(" game_state no tiene atributo game_over")
                 return False
                 
             if not game_state.game_over:
-                print("❌ El juego no ha terminado, no se puede guardar puntuación")
+                print(" El juego no ha terminado, no se puede guardar puntuación")
                 return False
             
             # 3. Verificar referencia al jugador
             if not hasattr(game_state, 'player') or game_state.player is None:
-                print("❌ No hay referencia al jugador en game_state")
+                print(" No hay referencia al jugador en game_state")
                 return False
             
             # 4. Calcular puntaje final
             final_score = game_state.calculate_final_score(game_duration, total_game_duration)
-            print(f"📊 Puntaje calculado: {final_score}")
+            print(f" Puntaje calculado: {final_score}")
             
             # 5. Crear entrada de puntuación
             score_entry = {
@@ -174,14 +174,14 @@ class ScoreManager:
             
             if success:
                 position = self.get_ranking_position(final_score)
-                print(f"🏆 Puntuación añadida exitosamente. Posición: {position}")
+                print(f" Puntuación añadida exitosamente. Posición: {position}")
             else:
-                print("❌ Error al guardar puntuaciones en archivo")
+                print(" Error al guardar puntuaciones en archivo")
             
             return success
             
         except Exception as e:
-            print(f"❌ Error crítico al añadir puntaje: {e}")
+            print(f" Error crítico al añadir puntaje: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -193,7 +193,6 @@ class ScoreManager:
         if n <= 1:
             return
         
-        # Bubble Sort optimizado
         for i in range(n - 1):
             swapped = False
             for j in range(0, n - i - 1):
@@ -201,7 +200,6 @@ class ScoreManager:
                     self.scores[j], self.scores[j + 1] = self.scores[j + 1], self.scores[j]
                     swapped = True
             
-            # Si no hubo intercambios, ya está ordenado
             if not swapped:
                 break
         
@@ -241,22 +239,21 @@ class ScoreManager:
             "top_scores": self.get_top_scores(3)
         }
 
-# Instancia global
 score_manager = ScoreManager()
 
-# Función de inicialización independiente
+
 def initialize_score_system():
     """Función para inicializar el sistema de puntajes"""
     try:
-        print("🎯 Inicializando sistema de puntuación global...")
+        print(" Inicializando sistema de puntuación global...")
         success = score_manager.initialize_score_system()
         
         if success:
-            print("✅ Sistema de puntuación global inicializado exitosamente")
+            print(" Sistema de puntuación global inicializado exitosamente")
         else:
-            print("❌ Falló la inicialización del sistema de puntuación global")
+            print(" Falló la inicialización del sistema de puntuación global")
             
         return success
     except Exception as e:
-        print(f"❌ Error crítico inicializando sistema de puntuaciones global: {e}")
+        print(f" Error crítico inicializando sistema de puntuaciones global: {e}")
         return False
