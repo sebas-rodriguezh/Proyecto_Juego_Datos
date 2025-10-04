@@ -243,7 +243,7 @@ class OrderPopupManager:
             self.popup_timer -= dt
             if self.popup_timer <= 0:
                 
-                print(f"⏰ Tiempo agotado para {self.pending_order.id} - Auto-rechazando")
+                print(f"Tiempo agotado para {self.pending_order.id} - Auto-rechazando")
                 
                 self.reject_order(self.game_engine)  
     

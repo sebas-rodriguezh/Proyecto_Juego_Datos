@@ -514,7 +514,7 @@ class UIManager:
         orders_text = self.font_small.render(f"Pedidos completados: {stats['orders_completed']}", True, (255, 255, 255))
         self.screen.blit(orders_text, (self.screen_width // 2 - orders_text.get_width() // 2, self.screen_height // 2 + 45))
         
-        restart_text = self.font_medium.render("Presiona R para reiniciar", True, (255, 255, 255))
+        restart_text = self.font_medium.render("Juego terminado", True, (255, 255, 255))
         self.screen.blit(restart_text, (self.screen_width // 2 - restart_text.get_width() // 2, self.screen_height // 2 + 70))
     
     def update(self, dt):
