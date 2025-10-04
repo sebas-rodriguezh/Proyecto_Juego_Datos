@@ -155,7 +155,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=6.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
+            time_scale=5.0  # ← ESCALA TEMPORAL (1s real = 3s juego)
         )
         self.game_time.start()
 
@@ -992,59 +992,10 @@ class GameEngine:
             return
   
   #OJO QUE ESTE ES FUNCIONAL. 
-    # def no_more_available_orders(self):
-    #     """Verifica si no quedan pedidos disponibles para completar - VERSIÓN CORREGIDA"""
-        
-    #     # Verificar si no hay pedidos activos, pendientes, en inventario O en popup
-    #     no_active_orders = (
-    #         len(self.active_orders) == 0 and 
-    #         len(self.pending_orders) == 0 and 
-    #         len(self.player.inventory) == 0 and
-    #         not self.popup_manager.has_pending_order()
-    #     )
-        
-    #     if not no_active_orders:
-    #         return False
-        
-    #     # ✅ CORRECCIÓN: Evitar duplicación - NO sumar orders_cancelled si ya están en rejected_orders
-    #     # Los pedidos rechazados del popup YA están en rejected_orders
-    #     # Los pedidos cancelados del inventario NO están en rejected_orders pero SÍ en orders_cancelled
-        
-    #     # Solo contar cancelaciones que NO sean rechazos del popup
-    #     unique_cancellations = max(0, self.game_state.orders_cancelled - len(self.rejected_orders))
-        
-    #     total_processed = (
-    #         len(self.completed_orders) + 
-    #         len(self.rejected_orders) +
-    #         unique_cancellations  # Solo cancelaciones únicas
-    #     )
-        
-    #     # También contar pedidos expirados que no están en ninguna lista
-    #     expired_count = sum(1 for order in self.all_orders if order.is_expired and not order.is_completed)
-    #     total_processed += expired_count
-        
-    #     # Verificar si hemos procesado todos los pedidos del juego
-    #     all_orders_processed = (total_processed >= len(self.all_orders))
-        
-    #     # DEBUG: Para verificar qué está pasando
-    #     print(f"🔍 VERIFICACIÓN FIN DEL JUEGO:")
-    #     print(f"   - Completados: {len(self.completed_orders)}")
-    #     print(f"   - Rechazados: {len(self.rejected_orders)}")
-    #     print(f"   - Cancelados (inventario): {self.game_state.orders_cancelled}")
-    #     print(f"   - Cancelados únicos: {unique_cancellations}")
-    #     print(f"   - Expirados: {expired_count}")
-    #     print(f"   - Popup activo: {self.popup_manager.has_pending_order()}")
-    #     print(f"   - Total procesado: {total_processed}")
-    #     print(f"   - Total pedidos: {len(self.all_orders)}")
-    #     print(f"   - ¿Juego debe terminar? {all_orders_processed}")
-
-    #     return all_orders_processed
-
-
-
     def no_more_available_orders(self):
         """Verifica si no quedan pedidos disponibles para completar - VERSIÓN CORREGIDA"""
         
+        # Verificar si no hay pedidos activos, pendientes, en inventario O en popup
         no_active_orders = (
             len(self.active_orders) == 0 and 
             len(self.pending_orders) == 0 and 
@@ -1055,32 +1006,39 @@ class GameEngine:
         if not no_active_orders:
             return False
         
+        # ✅ CORRECCIÓN: Evitar duplicación - NO sumar orders_cancelled si ya están en rejected_orders
+        # Los pedidos rechazados del popup YA están en rejected_orders
+        # Los pedidos cancelados del inventario NO están en rejected_orders pero SÍ en orders_cancelled
+        
+        # Solo contar cancelaciones que NO sean rechazos del popup
         unique_cancellations = max(0, self.game_state.orders_cancelled - len(self.rejected_orders))
-        expired_count = sum(1 for order in self.all_orders if order.is_expired and not order.is_completed)
-        expired_not_counted = max(0, expired_count - self.game_state.orders_cancelled)
         
         total_processed = (
             len(self.completed_orders) + 
             len(self.rejected_orders) +
-            unique_cancellations +  # Solo cancelaciones únicas
-            expired_not_counted     # Solo expirados no contados
+            unique_cancellations  # Solo cancelaciones únicas
         )
         
+        # También contar pedidos expirados que no están en ninguna lista
+        expired_count = sum(1 for order in self.all_orders if order.is_expired and not order.is_completed)
+        total_processed += expired_count
+        
+        # Verificar si hemos procesado todos los pedidos del juego
+        all_orders_processed = (total_processed >= len(self.all_orders))
+        
+        # DEBUG: Para verificar qué está pasando
         print(f"🔍 VERIFICACIÓN FIN DEL JUEGO:")
         print(f"   - Completados: {len(self.completed_orders)}")
         print(f"   - Rechazados: {len(self.rejected_orders)}")
         print(f"   - Cancelados (inventario): {self.game_state.orders_cancelled}")
         print(f"   - Cancelados únicos: {unique_cancellations}")
-        print(f"   - Expirados totales: {expired_count}")
-        print(f"   - Expirados no contados: {expired_not_counted}")
+        print(f"   - Expirados: {expired_count}")
         print(f"   - Popup activo: {self.popup_manager.has_pending_order()}")
         print(f"   - Total procesado: {total_processed}")
         print(f"   - Total pedidos: {len(self.all_orders)}")
-        print(f"   - ¿Juego debe terminar? {total_processed >= len(self.all_orders)}")
+        print(f"   - ¿Juego debe terminar? {all_orders_processed}")
 
-        return total_processed >= len(self.all_orders)
-
-
+        return all_orders_processed
 
 
 

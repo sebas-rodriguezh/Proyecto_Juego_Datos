@@ -58,14 +58,7 @@ class OrderList:
                 return order
         return None
     
-    # def remove_by_id(self, order_id: str) -> bool:
-    #     """Remueve una orden por su ID (rompe la estructura de cola, usar con cuidado)"""
-    #     for i, order in enumerate(self._orders):
-    #         if order.id == order_id:
-    #             del self._orders[i]
-    #             return True
-    #     return False
-    
+
     def remove_by_id(self, order_id: str) -> bool:
         """Remueve una orden por su ID manteniendo la estructura de cola"""
         # Crear una nueva cola sin el elemento a eliminar
@@ -105,26 +98,71 @@ class OrderList:
         """Convierte la OrderList a una lista Python"""
         return list(self._orders)
     
+    def _insertion_sort_by_priority(self, arr: List[Order]) -> List[Order]:
+        """Ordena una lista de órdenes por prioridad usando Insertion Sort (mayor prioridad primero)"""
+        for i in range(1, len(arr)):
+            key = arr[i]
+            j = i - 1
+            
+            # Mover elementos de arr[0..i-1] que tienen menor prioridad que key
+            while j >= 0 and arr[j].priority < key.priority:
+                arr[j + 1] = arr[j]
+                j -= 1
+            arr[j + 1] = key
+            
+        return arr
+    
+    def _insertion_sort_by_payout(self, arr: List[Order]) -> List[Order]:
+        """Ordena una lista de órdenes por payout usando Insertion Sort (mayor payout primero)"""
+        for i in range(1, len(arr)):
+            key = arr[i]
+            j = i - 1
+            
+            # Mover elementos de arr[0..i-1] que tienen menor payout que key
+            while j >= 0 and arr[j].payout < key.payout:
+                arr[j + 1] = arr[j]
+                j -= 1
+            arr[j + 1] = key
+            
+        return arr
+    
+    def _insertion_sort_by_deadline(self, arr: List[Order]) -> List[Order]:
+        """Ordena una lista de órdenes por deadline usando Insertion Sort (fechas más cercanas primero)"""
+        for i in range(1, len(arr)):
+            key = arr[i]
+            j = i - 1
+            
+            # Mover elementos de arr[0..i-1] que tienen deadlines más lejanos que key
+            while j >= 0 and arr[j].deadline > key.deadline:
+                arr[j + 1] = arr[j]
+                j -= 1
+            arr[j + 1] = key
+            
+        return arr
+    
     def reorganize_by_priority(self) -> None:
-        """Reorganiza la cola poniendo las órdenes de mayor prioridad al frente"""
+        """Reorganiza la cola poniendo las órdenes de mayor prioridad al frente usando Insertion Sort"""
         if self.is_empty():
             return
-        # Convertir a lista, ordenar por prioridad (mayor primero), y reconstruir deque
-        sorted_orders = sorted(self._orders, key=lambda order: order.priority, reverse=True)
+        # Convertir a lista, ordenar por prioridad usando insertion sort, y reconstruir deque
+        orders_list = list(self._orders)
+        sorted_orders = self._insertion_sort_by_priority(orders_list)
         self._orders = deque(sorted_orders)
     
     def reorganize_by_payout(self) -> None:
-        """Reorganiza la cola poniendo las órdenes de mayor payout al frente"""
+        """Reorganiza la cola poniendo las órdenes de mayor payout al frente usando Insertion Sort"""
         if self.is_empty():
             return
-        sorted_orders = sorted(self._orders, key=lambda order: order.payout, reverse=True)
+        orders_list = list(self._orders)
+        sorted_orders = self._insertion_sort_by_payout(orders_list)
         self._orders = deque(sorted_orders)
     
     def reorganize_by_deadline(self) -> None:
-        """Reorganiza la cola poniendo las órdenes más urgentes (deadline cercano) al frente"""
+        """Reorganiza la cola poniendo las órdenes más urgentes (deadline cercano) al frente usando Insertion Sort"""
         if self.is_empty():
             return
-        sorted_orders = sorted(self._orders, key=lambda order: order.deadline)
+        orders_list = list(self._orders)
+        sorted_orders = self._insertion_sort_by_deadline(orders_list)
         self._orders = deque(sorted_orders)
     
     def get_next_orders(self, count: int) -> List[Order]:
@@ -168,6 +206,7 @@ class OrderList:
             print(f"     ✅ Creado: {order.id} - Deadline: {order.deadline.strftime('%Y-%m-%d %H:%M:%S')}")
         
         return order_list
+    
     @classmethod
     def from_list(cls, orders: List[Order]) -> 'OrderList':
         """Crea una OrderList desde una lista de Orders existente"""
@@ -215,100 +254,3 @@ class OrderList:
         """Representación para debugging"""
         return f"OrderQueue(orders={list(self._orders)})"
 
-
-def probar_cola_pura():
-    """Función de prueba para demostrar el comportamiento de cola pura"""
-    
-    print("========== Prueba de Cola Pura ==========")
-    
-    # Crear cola vacía
-    cola = OrderList.create_empty()
-    print(f"Cola vacía: {cola}")
-    print(f"¿Está vacía? {cola.is_empty()}")
-    
-    # Simular algunas órdenes
-    from datetime import datetime
-    
-    ordenes_prueba = [
-        Order("REQ-001", [1, 2], [3, 4], 100.0, datetime.now(), 10, 2, 0),
-        Order("REQ-002", [2, 3], [4, 5], 150.0, datetime.now(), 15, 1, 0),
-        Order("REQ-003", [3, 4], [5, 6], 200.0, datetime.now(), 20, 3, 0),
-        Order("REQ-004", [4, 5], [6, 7], 80.0, datetime.now(), 5, 0, 0),
-    ]
-    
-    # Añadir órdenes a la cola (FIFO)
-    print("\n--- Añadiendo órdenes a la cola ---")
-    for orden in ordenes_prueba:
-        cola.enqueue(orden)
-        print(f"Enqueued: {orden.id} (priority: {orden.priority})")
-    
-    print(f"\nCola después de enqueue: {cola}")
-    print(f"Tamaño: {cola.size()}")
-    print(f"Frente de la cola: {cola.front().id}")
-    print(f"Final de la cola: {cola.rear().id}")
-    
-    # Procesar órdenes (FIFO)
-    print("\n--- Procesando órdenes (FIFO) ---")
-    while not cola.is_empty():
-        orden_actual = cola.dequeue()
-        print(f"Procesando: {orden_actual.id} (priority: {orden_actual.priority})")
-    
-    print(f"\nCola después de procesar todo: {cola}")
-    
-    # Probar reorganización por prioridad
-    print("\n--- Prueba con reorganización por prioridad ---")
-    
-    # Volver a llenar la cola
-    for orden in ordenes_prueba:
-        cola.enqueue(orden)
-    
-    print("Cola original (orden FIFO):")
-    for i, orden in enumerate(cola):
-        print(f"  {i}: {orden.id} (priority: {orden.priority})")
-    
-    # Reorganizar por prioridad
-    cola.reorganize_by_priority()
-    print("\nDespués de reorganizar por prioridad:")
-    for i, orden in enumerate(cola):
-        print(f"  {i}: {orden.id} (priority: {orden.priority})")
-    
-    # Procesar con prioridad
-    print("\nProcesando con prioridad:")
-    for _ in range(4):
-        if not cola.is_empty():
-            orden = cola.dequeue()
-            print(f"  Procesado: {orden.id} (priority: {orden.priority})")
-
-
-def demo_api_integration():
-    """Demo de integración con API"""
-    
-    print("\n========== Demo Integración API ==========")
-    
-    try:
-        # Obtener órdenes de la API
-        data_manager = APIManager()
-        cola_desde_api = OrderList.from_api_response(data_manager.get_jobs())
-        
-        print(f"Órdenes obtenidas de API: {cola_desde_api.size()}")
-        
-        # Reorganizar por prioridad para procesamiento eficiente
-        cola_desde_api.reorganize_by_priority()
-        
-        # Procesar las primeras 5 órdenes
-        print("\nProcesando primeras 5 órdenes por prioridad:")
-        for i in range(min(5, cola_desde_api.size())):
-            if not cola_desde_api.is_empty():
-                orden = cola_desde_api.dequeue()
-                print(f"  {i+1}. {orden.id} - Priority: {orden.priority} - Payout: ${orden.payout}")
-        
-        print(f"\nÓrdenes restantes en cola: {cola_desde_api.size()}")
-        
-    except Exception as e:
-        print(f"Error en demo API: {e}")
-
-
-# Ejecutar pruebas
-if __name__ == "__main__":
-    probar_cola_pura()
-    demo_api_integration()
