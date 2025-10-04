@@ -21,10 +21,13 @@ class GameTime:
         
     def start(self):
         """Inicia el temporizador del juego"""
-        current_pygame_time = pygame.time.get_ticks() / 1000.0
-        self.start_real_time = current_pygame_time - self.pygame_start_time
+        if self.start_real_time is None:
+            current_pygame_time = pygame.time.get_ticks() / 1000.0
+            self.start_real_time = current_pygame_time - self.pygame_start_time
+        
         self.paused = False
-        self.pause_duration = 0
+        if self.pause_duration == 0:  
+            self.pause_duration = 0
     
     def pause(self):
         if not self.paused and self.start_real_time is not None:

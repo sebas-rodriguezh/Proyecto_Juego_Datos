@@ -142,7 +142,7 @@ class GameEngine:
         self.game_time = GameTime(
             total_duration_min=15,
             game_start_time=game_start_datetime,  # Hora del JSON
-            time_scale=10.0  # ← ESCALA TEMPORAL (Modificar el parámetro si quiere correrlo 1s real = xs juego)
+            time_scale=1.0  # ← ESCALA TEMPORAL (Modificar el parámetro si quiere correrlo 1s real = xs juego)
         )
         self.game_time.start()
 
@@ -434,21 +434,25 @@ class GameEngine:
                 game_start_time=game_start_time,
                 time_scale=time_scale
             )
-            self.game_time.start()
+            
             
             import pygame
             current_pygame_time = pygame.time.get_ticks() / 1000.0
             
-            # Ajustar el tiempo de inicio para que refleje el tiempo transcurrido guardado
-            if "pygame_start_time" in game_time_data and "start_real_time" in game_time_data:
-                # Usar valores guardados si están disponibles
-                self.game_time.pygame_start_time = game_time_data["pygame_start_time"]
-                self.game_time.start_real_time = game_time_data["start_real_time"]
-            else:
-                # Ajuste manual para tiempo transcurrido
-                adjusted_start_time = current_pygame_time - self.game_time.pygame_start_time - elapsed_time
-                self.game_time.start_real_time = adjusted_start_time
             
+            if "pygame_start_time" in game_time_data and "start_real_time" in game_time_data:
+                
+                self.game_time.pygame_start_time = current_pygame_time - elapsed_time
+                self.game_time.start_real_time = 0  
+            else:
+                
+                self.game_time.pygame_start_time = current_pygame_time - elapsed_time
+                self.game_time.start_real_time = 0
+
+
+            self.game_time.paused = False
+            self.game_time.pause_duration = 0
+                        
             print(f"Tiempo restaurado: {elapsed_time:.1f}s transcurridos de {total_duration}s totales")
             
             weather_data = save_data["weather_state"]

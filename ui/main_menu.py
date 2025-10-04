@@ -1,4 +1,3 @@
-
 import pygame
 import sys
 from utils.save_load_manager import SaveLoadManager
@@ -8,6 +7,7 @@ class MainMenu:
         self.screen = screen
         self.width, self.height = screen.get_size()
         self.show_high_scores = False
+        self.show_controls = False  # NUEVO
         self.high_scores = self.load_high_scores()
         
         # Configurar fuentes
@@ -25,6 +25,7 @@ class MainMenu:
             {"text": "Nueva Partida", "action": "new_game"},
             {"text": "Cargar Partida", "action": "load_game"},
             {"text": "Ver Puntuaciones", "action": "high_scores"},
+            {"text": "Ver Controles", "action": "controls"},  # NUEVO
             {"text": "Salir", "action": "quit"}
         ]
         
@@ -88,9 +89,12 @@ class MainMenu:
                     elif event.key == pygame.K_ESCAPE:
                         self.show_save_slots = False
                         self.selected_save_slot = None
-                elif self.show_high_scores: 
+                elif self.show_high_scores:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
                         self.show_high_scores = False
+                elif self.show_controls:  # NUEVO
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+                        self.show_controls = False
                 else:
                     # Navegación en menú principal
                     if event.key == pygame.K_UP:
@@ -104,6 +108,8 @@ class MainMenu:
                             self.selected_save_slot = 0
                         elif action == "high_scores":
                             self.show_high_scores = True
+                        elif action == "controls":  # NUEVO
+                            self.show_controls = True
                         else:
                             return action
                     elif event.key == pygame.K_ESCAPE:
@@ -117,6 +123,8 @@ class MainMenu:
         
         if self.show_high_scores:
             self.draw_high_scores()
+        elif self.show_controls:  # NUEVO
+            self.draw_controls()
         elif self.show_save_slots:
             self.draw_save_slots()
         else:
@@ -125,7 +133,7 @@ class MainMenu:
     def draw_main_menu(self):
         """Dibuja el menú principal"""
         # Título
-        title = self.font_large.render("COURIER QUEST", True, (255, 215, 0))  # Dorado
+        title = self.font_large.render("COURIER QUEST", True, (255, 215, 0))
         title_shadow = self.font_large.render("COURIER QUEST", True, (150, 100, 0))
         
         # Efecto de sombra para el título
@@ -136,16 +144,16 @@ class MainMenu:
         subtitle = self.font_small.render("Sistema de Entregas", True, (200, 200, 200))
         self.screen.blit(subtitle, (self.width // 2 - subtitle.get_width() // 2, 160))
         
-       
+        # Opciones del menú
         for i, option in enumerate(self.options):
             if i == self.selected_option:
-                color = (255, 215, 0)  
+                color = (255, 215, 0)
                 text = self.font_medium.render("> " + option["text"] + " <", True, color)
             else:
-                color = (200, 200, 200)  
+                color = (200, 200, 200)
                 text = self.font_medium.render(option["text"], True, color)
             
-            y_pos = 250 + i * 60
+            y_pos = 230 + i * 50  # Ajustado para 5 opciones
             self.screen.blit(text, (self.width // 2 - text.get_width() // 2, y_pos))
         
         # Instrucciones
@@ -174,8 +182,65 @@ class MainMenu:
         instructions = self.font_small.render("ENTER para cargar, ESC para volver", 
                                             True, (150, 150, 150))
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
-        
 
+    def draw_controls(self):
+        """Dibuja la pantalla de controles"""
+        # Fondo semitransparente
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        self.screen.blit(overlay, (0, 0))
+        
+        # Título
+        title = self.font_large.render("CONTROLES DEL JUEGO", True, (255, 215, 0))
+        self.screen.blit(title, (self.width // 2 - title.get_width() // 2, 40))
+        
+        # Lista de controles
+        controls = [
+            ("MOVIMIENTO", ""),
+            ("W/A/S/D o Flechas", "Mover al jugador"),
+            ("", ""),
+            ("INTERACCION", ""),
+            ("E", "Recoger/Entregar pedido"),
+            ("Y", "Aceptar pedido en popup"),
+            ("N", "Rechazar pedido en popup"),
+            ("Clic Derecho", "Cancelar pedido del inventario"),
+            ("", ""),
+            ("ORGANIZACION", ""),
+            ("P", "Ordenar inventario por prioridad"),
+            ("O", "Ordenar inventario por urgencia"),
+            ("", ""),
+            ("SISTEMA", ""),
+            ("ESC", "Pausar juego / Cerrar popup"),
+            ("Ctrl+S", "Guardar partida (slot 1)"),
+            ("Ctrl+Z", "Deshacer última acción"),
+            ("Ctrl+Y", "Rehacer acción")
+        ]
+        
+        y_offset = 120
+        for control, description in controls:
+            if control == "" and description == "":
+                y_offset += 10  # Espacio entre secciones
+                continue
+            
+            if description == "":  # Es un encabezado
+                text = self.font_medium.render(control, True, (100, 200, 255))
+                self.screen.blit(text, (self.width // 2 - text.get_width() // 2, y_offset))
+                y_offset += 35
+            else:
+                # Control
+                control_text = self.font_small.render(control, True, (255, 215, 0))
+                self.screen.blit(control_text, (self.width // 2 - 200, y_offset))
+                
+                # Descripción
+                desc_text = self.font_small.render(description, True, (200, 200, 200))
+                self.screen.blit(desc_text, (self.width // 2 - 50, y_offset))
+                
+                y_offset += 28
+        
+        # Instrucciones
+        instructions = self.font_small.render("", 
+                                            True, (150, 150, 150))
+        self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
 
     def load_high_scores(self):
         """Carga las puntuaciones desde el archivo"""
@@ -190,7 +255,7 @@ class MainMenu:
         """Dibuja la pantalla de puntuaciones altas"""
         # Fondo
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 200))  # Fondo semitransparente
+        overlay.fill((0, 0, 0, 200))
         self.screen.blit(overlay, (0, 0))
         
         # Título
@@ -213,7 +278,7 @@ class MainMenu:
             no_scores = self.font_medium.render("No hay puntuaciones guardadas", True, (200, 200, 200))
             self.screen.blit(no_scores, (self.width // 2 - no_scores.get_width() // 2, 180))
         else:
-            for i, score in enumerate(self.high_scores[:10]):  # Top 10
+            for i, score in enumerate(self.high_scores[:10]):
                 y_pos = 160 + i * 30
                 x_pos = self.width // 2 - sum(col_widths) // 2
                 
@@ -222,7 +287,7 @@ class MainMenu:
                 self.screen.blit(pos_text, (x_pos, y_pos))
                 x_pos += col_widths[0]
                 
-                
+                # Jugador
                 name_text = self.font_small.render(score.get("player_name", "Jugador"), True, (255, 255, 255))
                 self.screen.blit(name_text, (x_pos, y_pos))
                 x_pos += col_widths[1]
@@ -237,7 +302,7 @@ class MainMenu:
                 self.screen.blit(earnings_text, (x_pos, y_pos))
                 x_pos += col_widths[3]
                 
-                # Fecha 
+                # Fecha
                 date_str = score.get("date", "")
                 if date_str:
                     try:
@@ -255,5 +320,3 @@ class MainMenu:
         # Instrucciones
         instructions = self.font_small.render("Presiona ESC o ENTER para volver", True, (150, 150, 150))
         self.screen.blit(instructions, (self.width // 2 - instructions.get_width() // 2, self.height - 50))
-
-
