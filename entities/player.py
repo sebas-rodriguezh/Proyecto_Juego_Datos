@@ -138,7 +138,7 @@ class Player:
             return False
         
         if self.stamina <= 0:
-            print("❌ Stamina insuficiente para moverse (agotado)")
+            print("Stamina insuficiente para moverse (agotado)")
             self.state = "exhausted"
             return False
         
@@ -168,7 +168,7 @@ class Player:
         
         #Verificar si hay suficiente stamina para este movimiento
         if self.stamina < stamina_consumption:
-            print(f"❌ Stamina insuficiente para moverse: {self.stamina:.1f} < {stamina_consumption:.1f}")
+            print(f"Stamina insuficiente para moverse: {self.stamina:.1f} < {stamina_consumption:.1f}")
             
             if self.stamina > 0:
                 remaining_stamina = self.stamina

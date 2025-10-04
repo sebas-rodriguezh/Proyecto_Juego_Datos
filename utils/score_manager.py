@@ -17,7 +17,6 @@ class ScoreManager:
         """Asegura que el directorio data existe"""
         try:
             os.makedirs("data", exist_ok=True)
-            print(" Directorio 'data' verificado/creado")
         except Exception as e:
             print(f" Error creando directorio data: {e}")
     
@@ -27,17 +26,15 @@ class ScoreManager:
             if self.initialized:
                 return True
                 
-            print("🔄 Inicializando sistema de puntuación...")
-            
             # Verificar/Crear directorio
             self._ensure_data_directory()
             
             # Verificar/Crear archivo si no existe
             if not os.path.exists(self.filename):
-                print("📄 Creando nuevo archivo de puntuaciones...")
+                print("Creando nuevo archivo de puntuaciones...")
                 self._create_initial_file()
             else:
-                print("📄 Archivo de puntuaciones encontrado, cargando...")
+                print(" Archivo de puntuaciones encontrado, cargando...")
             
             # Cargar puntuaciones existentes
             self.load_scores()
@@ -150,9 +147,7 @@ class ScoreManager:
                 "player_name": player_name,
                 "score": int(final_score),
                 "earnings": int(game_state.total_earnings),
-                "orders_completed": int(game_state.orders_completed),
                 "orders_cancelled": int(game_state.orders_cancelled),
-                "perfect_deliveries": int(game_state.perfect_deliveries),
                 "late_deliveries": int(game_state.late_deliveries),
                 "best_streak": int(game_state.best_streak),
                 "victory": victory,
@@ -173,8 +168,7 @@ class ScoreManager:
             success = self.save_scores()
             
             if success:
-                position = self.get_ranking_position(final_score)
-                print(f" Puntuación añadida exitosamente. Posición: {position}")
+                pass
             else:
                 print(" Error al guardar puntuaciones en archivo")
             

@@ -149,7 +149,7 @@ class Order:
         timeliness = self.get_delivery_timeliness(current_time)
         time_remaining = self.get_time_remaining(current_time)
         
-        print(f"🔍 REPUTACIÓN {self.id}: {timeliness}, {time_remaining:.0f}s restantes")
+        print(f"REPUTACIÓN {self.id}: {timeliness}, {time_remaining:.0f}s restantes")
         
         if timeliness == "early":
             print("   +5 reputación (entrega temprana)")

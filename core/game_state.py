@@ -65,7 +65,7 @@ class GameState:
                     old_reputation = getattr(self.player, 'reputation', 70)
                     if hasattr(self.player, 'reputation'):
                         self.player.reputation = min(100, self.player.reputation + reputation_bonus)
-                        print(f"🏆 BONUS DE RACHA: +{reputation_bonus} reputación por racha de {self.current_streak} entregas perfectas")
+                        print(f"BONUS DE RACHA: +{reputation_bonus} reputación por racha de {self.current_streak} entregas perfectas")
                         print(f"   Reputación: {old_reputation} → {self.player.reputation}")        
 
         self._cached_final_score = None
@@ -122,7 +122,7 @@ class GameState:
         final_score = base_score + time_bonus - cancellation_penalty - late_penalty
         final_score = max(0, int(final_score))
         
-        print(f"   - PUNTAJE FINAL: ${final_score}")
+        print(f"   - PUNTAJE FINAL: {final_score}")
         
         self._cached_final_score = final_score
         self._cached_game_duration = game_duration

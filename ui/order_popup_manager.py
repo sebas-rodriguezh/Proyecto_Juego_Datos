@@ -45,7 +45,6 @@ class OrderPopupManager:
         if not self.cancel_popup_active:
             self.selected_order_for_cancel = order
             self.cancel_popup_active = True
-            print(f" Mostrando popup de cancelación para: {order.id}")
     
     def handle_event(self, event, game_engine, player, active_orders):
         """Maneja eventos relacionados con los popups """
@@ -154,7 +153,6 @@ class OrderPopupManager:
             self.popup_active = False
             self.pending_order = None
             
-            print(f"✅ Pedido {order.id} ACEPTADO y añadido a órdenes activas")
             return {
                 "type": "accept_order", 
                 "result": "accepted", 
@@ -183,9 +181,9 @@ class OrderPopupManager:
         
         if hasattr(game_engine, 'rejected_orders'):
             game_engine.rejected_orders.enqueue(order)
-            print(f"📝 Pedido {order.id} añadido a rechazados. Total: {len(game_engine.rejected_orders)}")
+            print(f"Pedido {order.id} añadido a rechazados. Total: {len(game_engine.rejected_orders)}")
         
-        print(f"📊 Rechazo registrado como cancelación - Total cancelaciones: {game_engine.game_state.orders_cancelled}")
+        print(f"Rechazo registrado como cancelación - Total cancelaciones: {game_engine.game_state.orders_cancelled}")
         
         # Limpiar popup
         self.popup_active = False
@@ -215,7 +213,7 @@ class OrderPopupManager:
             game_state.orders_cancelled += 1
             game_state.current_streak = 0
 
-            print(f"🗑️ Pedido {order.id} CANCELADO del inventario")
+            print(f"Pedido {order.id} CANCELADO del inventario")
             
             # Limpiar popup
             self.cancel_popup_active = False

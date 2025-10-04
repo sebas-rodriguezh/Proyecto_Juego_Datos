@@ -24,8 +24,6 @@ class InteractionManager:
 
     def handle_interaction(self, game_state, game_map):
         """Procesa interacciones con gestión completa de deadlines"""
-        print("=== DEBUG INTERACCIÓN ===")
-        print(f"Posición jugador: ({self.player.grid_x}, {self.player.grid_y})")
         
         interactable_orders = self.player.get_interactable_orders(
             self.active_orders, game_map, self.interaction_radius, self.game_time
@@ -63,11 +61,6 @@ class InteractionManager:
             timeliness = order.get_delivery_timeliness(current_time)
             is_early = (timeliness == "early")
             is_on_time = (timeliness == "on_time" or timeliness == "early")
-            
-            print(f" TIMELINESS DEBUG: {order.id}")
-            print(f"   - Timeliness: {timeliness}")
-            print(f"   - Es temprano: {is_early}")
-            print(f"   - Es a tiempo: {is_on_time}")
             
             game_state.complete_order(order, on_time=is_on_time, early=is_early)
             

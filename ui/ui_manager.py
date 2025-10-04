@@ -228,7 +228,7 @@ class UIManager:
         """Dibuja el inventario mostrando colores originales y tiempo restante"""
         x_offset = cols * self.game_map.tile_size
         
-        inventory_title = self.font_medium.render("Inventario:", True, (0, 0, 0))
+        inventory_title = self.font_medium.render("Inventario (Click derecho sobre el pedido para cancelar):", True, (0, 0, 0))
         self.screen.blit(inventory_title, (x_offset + 10, 210))
         
         if player.inventory:

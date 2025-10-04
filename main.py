@@ -1,4 +1,3 @@
-# main.py - VERSIÓN ACTUALIZADA CON INICIALIZACIÓN CENTRALIZADA
 import pygame
 import sys
 from ui.main_menu import MainMenu
@@ -8,27 +7,19 @@ from utils.score_manager import initialize_score_system
 def main():
     pygame.init()
     
-    # ✅ INICIALIZACIÓN CENTRALIZADA ANTES DEL BUCLE
-    print("🎮 Iniciando Courier Quest...")
-    
-    # 1. Configurar directorios
     setup_directories()
     
-    # 2. Inicializar sistema de puntuación
     score_success = initialize_score_system()
     if not score_success:
-        print("⚠️ Continuando sin sistema de puntuación...")
+        print("Continuando sin sistema de puntuación...")
     
-    # Bucle principal que siempre vuelve al menú
     while True:
         try:
-            # 1. Crear pantalla y menú
             screen = pygame.display.set_mode((800, 600))
             pygame.display.set_caption("Courier Quest")
             menu = MainMenu(screen)
             clock = pygame.time.Clock()
             
-            # 2. Mostrar menú
             menu_running = True
             load_slot = None
             
@@ -41,20 +32,18 @@ def main():
                 elif action == "new_game":
                     menu_running = False
                 elif action and action.startswith("load_"):
-                    load_slot = action[5:]  # Extraer el nombre del slot
+                    load_slot = action[5:]  
                     menu_running = False
                 
                 menu.draw()
                 pygame.display.flip()
                 clock.tick(60)
             
-            # 3. Ejecutar juego (con opción de cargar partida)
             from game_engine import GameEngine
             game = GameEngine(load_slot=load_slot)
             game.run()
             
         except pygame.error as e:
-            # Si el display se cerró, volver al menú
             if "display Surface quit" in str(e):
                 continue
             else:
@@ -71,3 +60,24 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+#CONTROLES DEL JUEGO
+
+# MOVIMIENTO
+# • WASD - Moverse
+
+# INTERACCIÓN
+# • Y - Aceptar
+# • N - Rechazar
+# • E - Agarrar/Dejar pedido
+# • Clic derecho en pedido - Cancelar
+
+# ÓRDENES
+# • P - Ordenar por Prioridad
+# • O - Ordenar por Deadline
+
+# SISTEMA
+# • Esc - Pausa
+# • Ctrl + S - Guardar (primer slot)
+# • Ctrl + Z - Volver al estado anterior
+# • Ctrl + Y - Volver al estado normal
