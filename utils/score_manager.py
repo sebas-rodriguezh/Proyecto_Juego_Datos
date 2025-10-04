@@ -187,8 +187,25 @@ class ScoreManager:
             return False
     
     def sort_scores(self) -> None:
-        """Ordena los puntajes de mayor a menor"""
-        self.scores.sort(key=lambda x: x.get("score", 0), reverse=True)
+        """Ordena los puntajes de mayor a menor usando Bubble Sort - Complejidad: O(n²)"""
+        n = len(self.scores)
+        
+        if n <= 1:
+            return
+        
+        # Bubble Sort optimizado
+        for i in range(n - 1):
+            swapped = False
+            for j in range(0, n - i - 1):
+                if self.scores[j].get("score", 0) < self.scores[j + 1].get("score", 0):
+                    self.scores[j], self.scores[j + 1] = self.scores[j + 1], self.scores[j]
+                    swapped = True
+            
+            # Si no hubo intercambios, ya está ordenado
+            if not swapped:
+                break
+        
+        
     
     def get_top_scores(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Obtiene los mejores puntajes"""
